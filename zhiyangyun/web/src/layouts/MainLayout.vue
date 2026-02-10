@@ -5,6 +5,7 @@
       <el-menu router default-active="/">
         <el-menu-item index="/">M1 资产与房间管理</el-menu-item>
         <el-menu-item index="/elders">M2 长者全周期管理</el-menu-item>
+        <el-menu-item index="/care">M3 服务与护理标准化</el-menu-item>
       </el-menu>
     </el-aside>
     <el-container>

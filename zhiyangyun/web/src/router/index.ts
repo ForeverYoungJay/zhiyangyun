@@ -3,6 +3,7 @@ import LoginPage from '../pages/LoginPage.vue'
 import MainLayout from '../layouts/MainLayout.vue'
 import AssetRoomPage from '../pages/asset-room/AssetRoomPage.vue'
 import ElderLifecyclePage from '../pages/elder/ElderLifecyclePage.vue'
+import CareStandardPage from '../pages/care/CareStandardPage.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -13,7 +14,8 @@ const router = createRouter({
       component: MainLayout,
       children: [
         { path: '', component: AssetRoomPage },
-        { path: 'elders', component: ElderLifecyclePage }
+        { path: 'elders', component: ElderLifecyclePage },
+        { path: 'care', component: CareStandardPage }
       ]
     }
   ]
