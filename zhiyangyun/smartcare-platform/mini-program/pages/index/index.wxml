@@ -1,0 +1,4 @@
+<view style="padding: 24rpx;">
+  <text style="font-size: 34rpx; font-weight: 600;">{{title}}</text>
+  <view style="margin-top: 20rpx; color: #666;">小程序骨架已创建，下一阶段接入登录与长者信息。</view>
+</view>
