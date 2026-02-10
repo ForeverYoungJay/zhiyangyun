@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.security import get_password_hash
 from app.models import User, Role, Permission, UserRole, RolePermission
 from app.models.asset import Building, Floor, Room, Bed
+from app.models.elder import CrmLead, Elder
 
 DB_URL = "postgresql+psycopg://postgres:postgres@db:5432/zhiyangyun"
 TENANT_ID = "tenant-demo-001"
@@ -58,7 +59,18 @@ def run():
         )
         db.add(r1)
         db.flush()
-        db.add(Bed(id=str(uuid.uuid4()), tenant_id=TENANT_ID, room_id=r1.id, bed_no="1", status="vacant", qr_code=f"BED:{TENANT_ID}:{r1.id}:1"))
+        bed = Bed(id=str(uuid.uuid4()), tenant_id=TENANT_ID, room_id=r1.id, bed_no="1", status="vacant", qr_code=f"BED:{TENANT_ID}:{r1.id}:1")
+        db.add(bed)
+
+        lead = CrmLead(id=str(uuid.uuid4()), tenant_id=TENANT_ID, name="张三", phone="13800000000", source_channel="offline", status="new", notes="首访")
+        db.add(lead)
+        db.flush()
+        elder = Elder(
+            id=str(uuid.uuid4()), tenant_id=TENANT_ID, lead_id=lead.id, elder_no="ELD-0001", name="王大爷",
+            gender="male", id_card="", care_level="L2", status="assessed"
+        )
+        db.add(elder)
+
         db.commit()
         print("seed done")
 

@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import LoginPage from '../pages/LoginPage.vue'
 import MainLayout from '../layouts/MainLayout.vue'
 import AssetRoomPage from '../pages/asset-room/AssetRoomPage.vue'
+import ElderLifecyclePage from '../pages/elder/ElderLifecyclePage.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -10,7 +11,10 @@ const router = createRouter({
     {
       path: '/',
       component: MainLayout,
-      children: [{ path: '', component: AssetRoomPage }]
+      children: [
+        { path: '', component: AssetRoomPage },
+        { path: 'elders', component: ElderLifecyclePage }
+      ]
     }
   ]
 })

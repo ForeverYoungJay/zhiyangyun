@@ -4,6 +4,7 @@
       <div style="padding:16px;font-weight:700">智慧养老管理门户</div>
       <el-menu router default-active="/">
         <el-menu-item index="/">M1 资产与房间管理</el-menu-item>
+        <el-menu-item index="/elders">M2 长者全周期管理</el-menu-item>
       </el-menu>
     </el-aside>
     <el-container>

@@ -16,6 +16,7 @@ docker compose run --rm seed
 - JWT 登录鉴权
 - 统一返回格式：`{success, message, data}`
 - M1 资产与房间管理：楼栋 / 楼层 / 房间 / 床位 / 床位状态 / 二维码值
+- M2 长者全周期管理：CRM线索 / 建档 / 入院 / 转床 / 退院 / 变更日志
 
 ## 数据迁移
 ```bash
