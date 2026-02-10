@@ -6,30 +6,29 @@ services:
       POSTGRES_DB: smartcare
       POSTGRES_USER: smartcare
       POSTGRES_PASSWORD: smartcare
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
 
   redis:
     image: redis:7
     container_name: smartcare-redis
-    ports:
-      - "6379:6379"
+    ports: ["6379:6379"]
 
-  minio:
-    image: minio/minio:latest
-    container_name: smartcare-minio
-    command: server /data --console-address ":9001"
+  backend:
+    build: ../backend
+    container_name: smartcare-backend
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - miniodata:/data
+      DATABASE_URL: postgresql+asyncpg://smartcare:smartcare@postgres:5432/smartcare
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: smartcare-dev-secret
+    depends_on: [postgres, redis]
+    ports: ["8000:8000"]
+
+  web-admin:
+    build: ../web-admin
+    container_name: smartcare-web-admin
+    depends_on: [backend]
+    ports: ["3000:3000"]
 
 volumes:
   pgdata:
-  miniodata:
