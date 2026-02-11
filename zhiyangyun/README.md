@@ -15,6 +15,15 @@ docker compose run --rm seed
 ## 本次补齐的跨模块主链路
 建档 → 入院 → 床位绑定（库存）→ 护理服务项/套餐（商城）→ 护理任务（订单）→ 护理扫码完成自动扣费并计入账单/发票（余额）→ 家属查看账单/护理记录 → 家属问卷评价 → 绩效统计 → 看板展示
 
+## 2026-02 护理治理升级（本次新增）
+1. **护理项目中心**：独立护理项目可新增/删除/启停；项目包支持默认半年配置。
+2. **项目包分配到护理员**：`/care/package-assignments` 记录责任护理员、生效周期（默认 6 个月）。
+3. **任务精确计时**：扫码打卡精确到秒，记录开始/结束/总秒数；任务看板 `/care/tasks/board` 展示“谁在做什么+耗时”。
+4. **查房任务**：护理部部长/生活管理员/行政可新增护理查房、行政查房（`/care/tasks/round`）。
+5. **规范检查留档**：任务支持上传照片URL与问题描述，并可上报院长（`/care/tasks/{id}/issues`）。
+6. **院长审核与绩效扣分**：护理员绩效初始100；院长审核通过后扣分；<80 自动生成“下月调岗建议”。
+7. **紧急任务与周期下发**：支持紧急一键下发、按天/月/季度/年/自定义次数批量下发（`/care/tasks/dispatch`）。
+
 ### 关键联动点
 - M2 入院/转床/退院增加状态机约束（仅 assessed/discharged 可入院；仅 admitted 可转床/退院）
 - M3 扫码校验修复：扫码值必须匹配长者当前床位 `bed.qr_code`
@@ -37,6 +46,16 @@ docker compose run --rm seed
 - `GET /api/v1/b2-family/surveys?elder_id=...`
 - `POST /api/v1/b2-family/surveys`
 - `GET /api/v1/b3-dashboard/performance-summary`
+- `PATCH /api/v1/care/items/{id}/status`
+- `DELETE /api/v1/care/items/{id}`
+- `POST /api/v1/care/package-assignments`
+- `GET /api/v1/care/caregivers`
+- `GET /api/v1/care/tasks/board`
+- `POST /api/v1/care/tasks/round`
+- `POST /api/v1/care/tasks/{id}/issues`
+- `POST /api/v1/care/tasks/{id}/dean-review`
+- `POST /api/v1/care/tasks/dispatch`
+- `GET /api/v1/care/caregivers/{id}/performance`
 
 ## 前端联调入口
 - `M2 长者全周期管理`：建档+入院/转床/退院

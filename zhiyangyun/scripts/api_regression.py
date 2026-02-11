@@ -71,16 +71,32 @@ class Client:
         pkg = self._call("POST", "/care/packages", {"name": "日常护理包", "period": "daily"})
         self._call("POST", "/care/package-items", {"package_id": pkg["id"], "item_id": item["id"], "quantity": 1})
         elder_pkg = self._call("POST", "/care/elder-packages", {"elder_id": elder["id"], "package_id": pkg["id"], "start_date": str(date.today())})
+        self._call("PATCH", f"/care/items/{item['id']}/status", {"status": "disabled"})
+        self._call("PATCH", f"/care/items/{item['id']}/status", {"status": "active"})
         self._call("GET", "/care/items")
         self._call("GET", "/care/packages")
+        self._call("GET", "/care/caregivers")
+        assignment = self._call("POST", "/care/package-assignments", {"package_id": pkg["id"], "caregiver_id": login["user_id"], "start_date": str(date.today()), "months": 6})
+        self._check("care.assignment_created", bool(assignment and assignment.get("id")), f"assignment={assignment}")
         tasks = self._call("POST", "/care/tasks/generate", {"elder_package_id": elder_pkg["id"], "scheduled_at": datetime.now(timezone.utc).isoformat()}) or []
         listed_tasks = self._call("GET", "/care/tasks") or []
         task_id = self._first_id(tasks) or self._first_id(listed_tasks)
         self._check("care.task_generated", bool(task_id), f"tasks={tasks}")
         if task_id:
             self._call("POST", f"/care/tasks/{task_id}/scan-in", {"qr_value": bed["qr_code"]})
+            board = self._call("GET", "/care/tasks/board") or []
+            self._check("care.board_in_progress", len(board) >= 1, f"board={board}")
             self._call("POST", f"/care/tasks/{task_id}/scan-out", {"qr_value": bed["qr_code"]})
             self._call("POST", f"/care/tasks/{task_id}/supervise", {"score": 96})
+            self._call("POST", f"/care/tasks/{task_id}/issues", {"photo_urls": ["https://example.com/check.jpg"], "description": "地面湿滑", "report_to_dean": True})
+            self._call("POST", f"/care/tasks/{task_id}/dean-review", {"approved": True, "note": "核查通过", "deduction_score": 25})
+            perf = self._call("GET", f"/care/caregivers/{login['user_id']}/performance") or {}
+            self._check("care.performance_deducted", perf.get("score", 100) <= 75, f"perf={perf}")
+            self._check("care.rotation_suggestion", bool(perf.get("rotation_suggestion")), f"perf={perf}")
+
+        self._call("POST", "/care/tasks/round", {"elder_id": elder["id"], "item_id": item["id"], "round_type": "nursing_round", "scheduled_at": datetime.now(timezone.utc).isoformat()})
+        self._call("POST", "/care/tasks/dispatch", {"elder_package_id": elder_pkg["id"], "dispatch_type": "emergency", "frequency": "day", "custom_times": 1, "start_at": datetime.now(timezone.utc).isoformat()})
+        self._call("POST", "/care/tasks/dispatch", {"elder_package_id": elder_pkg["id"], "dispatch_type": "periodic", "frequency": "custom", "custom_times": 2, "start_at": datetime.now(timezone.utc).isoformat()})
 
         order = self._call("POST", "/m4-medication/orders", {"elder_id": elder["id"], "drug_name": "阿司匹林", "dosage": "100mg", "frequency": "qd", "start_date": str(date.today())})
         self._call("POST", "/m4-medication/executions", {"order_id": order["id"], "result": "done", "note": "按时执行"})
