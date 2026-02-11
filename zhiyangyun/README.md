@@ -43,6 +43,9 @@ docker compose run --rm seed
 本次新增：
 - `GET /api/v1/b2-family/elders/{elder_id}/bills`
 - `GET /api/v1/b2-family/elders/{elder_id}/care-records`
+- `GET /api/v1/b2-family/elders/{elder_id}/overview`（新增：家属长者总览）
+- `GET /api/v1/b2-family/services/catalog`（新增：家属服务目录）
+- `POST /api/v1/b2-family/services/order`（新增：家属服务增购）
 - `GET /api/v1/b2-family/surveys?elder_id=...`
 - `POST /api/v1/b2-family/surveys`
 - `GET /api/v1/b3-dashboard/performance-summary`
@@ -63,6 +66,17 @@ docker compose run --rm seed
 - `A1-M7 费用管理`：可见自动扣费后的明细与发票
 - `B2 家属门户`：查看账单、护理记录、提交问卷评价
 - `B3 运营看板`：展示实时绩效汇总 + 历史指标
+
+## 开发文档（docs）
+- `docs/01-功能遗漏审计.md`
+- `docs/02-架构说明.md`
+- `docs/03-数据模型字典.md`
+- `docs/04-API清单.md`
+- `docs/05-业务流程时序.md`
+- `docs/06-权限矩阵.md`
+- `docs/07-部署运维.md`
+- `docs/08-测试与验收手册.md`
+- `docs/09-变更日志.md`
 
 ## 自动化 API 回归
 脚本位置：`scripts/api_regression.py`

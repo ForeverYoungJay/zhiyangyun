@@ -2,6 +2,12 @@ from datetime import date
 from pydantic import BaseModel, Field
 
 
+class FamilyServiceOrderCreate(BaseModel):
+    elder_id: str
+    package_id: str
+    start_date: date | None = None
+
+
 class MiniappServiceRequestCreate(BaseModel):
     elder_id: str
     request_type: str = "repair"

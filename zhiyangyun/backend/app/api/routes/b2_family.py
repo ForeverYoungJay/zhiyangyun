@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import CurrentUser, get_current_user
 from app.db.session import get_db
 from app.schemas.common import ApiResponse
-from app.schemas.business import FamilyAccountCreate, FamilyVisitCreate, FamilySurveyCreate
+from app.schemas.business import FamilyAccountCreate, FamilyVisitCreate, FamilySurveyCreate, FamilyServiceOrderCreate
 from app.services.business_service import BusinessService
 
 router = APIRouter(prefix="/b2-family", tags=["B2"])
@@ -39,6 +39,24 @@ def elder_bills(elder_id: str, db: Session = Depends(get_db), current: CurrentUs
 @router.get("/elders/{elder_id}/care-records", response_model=ApiResponse)
 def elder_care_records(elder_id: str, db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
     return ApiResponse(data=service.list_family_care_records(db, current.tenant_id, elder_id))
+
+
+@router.get("/elders/{elder_id}/overview", response_model=ApiResponse)
+def elder_overview(elder_id: str, db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
+    data = service.get_family_elder_overview(db, current.tenant_id, elder_id)
+    if not data:
+        return ApiResponse(code=404, message="长者不存在", data=None)
+    return ApiResponse(data=data)
+
+
+@router.get("/services/catalog", response_model=ApiResponse)
+def service_catalog(db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
+    return ApiResponse(data=service.list_service_catalog(db, current.tenant_id))
+
+
+@router.post("/services/order", response_model=ApiResponse)
+def service_order(payload: FamilyServiceOrderCreate, db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
+    return ApiResponse(message="created", data=service.create_family_service_order(db, current.tenant_id, payload))
 
 
 @router.get("/surveys", response_model=ApiResponse)

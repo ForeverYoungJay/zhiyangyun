@@ -138,6 +138,13 @@ class Client:
         self._call("POST", "/b2-family/visits", {"family_id": family["id"], "visit_date": str(date.today())})
         self._call("GET", "/b2-family/accounts")
         self._call("GET", "/b2-family/visits")
+        family_overview = self._call("GET", f"/b2-family/elders/{elder['id']}/overview") or {}
+        family_catalog = self._call("GET", "/b2-family/services/catalog") or {}
+        self._check("family.overview_ready", isinstance(family_overview, dict) and bool(family_overview.get("elder")), f"overview={family_overview}")
+        self._check("family.catalog_ready", isinstance(family_catalog, dict) and len(family_catalog.get("packages", [])) > 0, f"catalog={family_catalog}")
+        if family_catalog.get("packages"):
+            self._call("POST", "/b2-family/services/order", {"elder_id": elder["id"], "package_id": family_catalog["packages"][0]["id"]})
+
         family_bills = self._call("GET", f"/b2-family/elders/{elder['id']}/bills") or []
         family_records = self._call("GET", f"/b2-family/elders/{elder['id']}/care-records") or []
         self._check("linkage.auto_billing_visible_to_family", len(family_bills) > 0, f"bills={family_bills}")

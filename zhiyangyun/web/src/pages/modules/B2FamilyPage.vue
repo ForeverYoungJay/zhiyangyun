@@ -56,6 +56,33 @@
           </div>
 
           <el-tabs>
+            <el-tab-pane label="长者总览">
+              <el-descriptions v-if="elderOverview" :column="2" border>
+                <el-descriptions-item label="长者姓名">{{ elderOverview.elder?.name }}</el-descriptions-item>
+                <el-descriptions-item label="护理等级">{{ elderOverview.elder?.care_level }}</el-descriptions-item>
+                <el-descriptions-item label="在院状态">{{ elderOverview.elder?.status }}</el-descriptions-item>
+                <el-descriptions-item label="生效套餐数">{{ elderOverview.active_packages }}</el-descriptions-item>
+                <el-descriptions-item label="最近体温">{{ elderOverview.latest_vital?.temperature ?? '-' }}</el-descriptions-item>
+                <el-descriptions-item label="最近血压">{{ elderOverview.latest_vital ? `${elderOverview.latest_vital.systolic}/${elderOverview.latest_vital.diastolic}` : '-' }}</el-descriptions-item>
+              </el-descriptions>
+              <el-empty v-else description="请选择长者查看总览" />
+            </el-tab-pane>
+            <el-tab-pane label="服务增购">
+              <el-form inline>
+                <el-form-item label="护理套餐">
+                  <el-select v-model="serviceOrder.package_id" style="width:260px" placeholder="选择增购套餐">
+                    <el-option v-for="p in serviceCatalog.packages" :key="p.id" :label="`${p.name}（${p.period}）`" :value="p.id" />
+                  </el-select>
+                </el-form-item>
+                <el-button type="primary" @click="placeServiceOrder">立即下单</el-button>
+              </el-form>
+              <el-table :data="serviceCatalog.items" border style="margin-top:10px">
+                <el-table-column prop="name" label="项目"/>
+                <el-table-column prop="category" label="类别"/>
+                <el-table-column prop="unit_price" label="单价"/>
+                <el-table-column prop="duration_min" label="时长(分钟)"/>
+              </el-table>
+            </el-tab-pane>
             <el-tab-pane label="账单明细">
               <el-table :data="bills" border>
                 <el-table-column prop="item_name" label="项目"/>
@@ -103,18 +130,23 @@ const families = ref<any[]>([])
 const bills = ref<any[]>([])
 const careRecords = ref<any[]>([])
 const surveys = ref<any[]>([])
+const serviceCatalog = ref<any>({ items: [], packages: [] })
+const elderOverview = ref<any>(null)
 const selectedElderId = ref('')
 
 const form = reactive({ elder_id: '', name: '', phone: '', relation: '' })
 const survey = reactive({ score: 5, comment: '' })
+const serviceOrder = reactive({ package_id: '' })
 
 const loadBase = async () => {
   elders.value = (await http.get('/elders')).data.data
   families.value = (await http.get('/b2-family/accounts')).data.data
+  serviceCatalog.value = (await http.get('/b2-family/services/catalog')).data.data
 }
 
 const loadElderPortalData = async () => {
   if (!selectedElderId.value) return
+  elderOverview.value = (await http.get(`/b2-family/elders/${selectedElderId.value}/overview`)).data.data
   bills.value = (await http.get(`/b2-family/elders/${selectedElderId.value}/bills`)).data.data
   careRecords.value = (await http.get(`/b2-family/elders/${selectedElderId.value}/care-records`)).data.data
   surveys.value = (await http.get('/b2-family/surveys', { params: { elder_id: selectedElderId.value } })).data.data
@@ -140,6 +172,13 @@ const submitSurvey = async () => {
   await http.post('/b2-family/surveys', { elder_id: selectedElderId.value, score: survey.score, comment: survey.comment })
   survey.comment = ''
   ElMessage.success('评价提交成功')
+  await loadElderPortalData()
+}
+
+const placeServiceOrder = async () => {
+  if (!selectedElderId.value || !serviceOrder.package_id) return ElMessage.error('请先选择长者和套餐')
+  await http.post('/b2-family/services/order', { elder_id: selectedElderId.value, package_id: serviceOrder.package_id })
+  ElMessage.success('增购下单成功')
   await loadElderPortalData()
 }
 

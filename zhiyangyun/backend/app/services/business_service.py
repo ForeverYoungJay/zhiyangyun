@@ -5,9 +5,10 @@ from sqlalchemy.orm import Session
 
 from app.models.asset import Bed
 from app.models.business import MiniappServiceRequest, FamilyAccount, FamilyVisit, DashboardMetric, FamilyCareRecord, FamilySurvey
-from app.models.care import CareTask
-from app.models.medical import BillingItem
-from app.schemas.business import MiniappServiceRequestCreate, FamilyAccountCreate, FamilyVisitCreate, DashboardMetricCreate, FamilySurveyCreate
+from app.models.care import CareTask, CarePackage, ElderPackage, ServiceItem
+from app.models.elder import Elder
+from app.models.medical import BillingItem, VitalSignRecord
+from app.schemas.business import MiniappServiceRequestCreate, FamilyAccountCreate, FamilyVisitCreate, DashboardMetricCreate, FamilySurveyCreate, FamilyServiceOrderCreate
 
 
 class BusinessService:
@@ -55,6 +56,52 @@ class BusinessService:
 
     def create_survey(self, db: Session, tenant_id: str, payload: FamilySurveyCreate):
         return self._save(db, FamilySurvey(tenant_id=tenant_id, **payload.model_dump()))
+
+    def get_family_elder_overview(self, db: Session, tenant_id: str, elder_id: str):
+        elder = db.scalar(select(Elder).where(Elder.tenant_id == tenant_id, Elder.id == elder_id))
+        if not elder:
+            return None
+
+        latest_vital = db.scalar(
+            select(VitalSignRecord)
+            .where(VitalSignRecord.tenant_id == tenant_id, VitalSignRecord.elder_id == elder_id)
+            .order_by(VitalSignRecord.recorded_at.desc())
+            .limit(1)
+        )
+
+        open_packages = db.scalar(
+            select(func.count()).select_from(ElderPackage).where(
+                ElderPackage.tenant_id == tenant_id,
+                ElderPackage.elder_id == elder_id,
+                ElderPackage.status == "active",
+            )
+        ) or 0
+
+        return {
+            "elder": elder,
+            "latest_vital": latest_vital,
+            "active_packages": int(open_packages),
+        }
+
+    def list_service_catalog(self, db: Session, tenant_id: str):
+        return {
+            "items": db.scalars(
+                select(ServiceItem).where(ServiceItem.tenant_id == tenant_id, ServiceItem.status == "active")
+            ).all(),
+            "packages": db.scalars(
+                select(CarePackage).where(CarePackage.tenant_id == tenant_id, CarePackage.status == "active")
+            ).all(),
+        }
+
+    def create_family_service_order(self, db: Session, tenant_id: str, payload: FamilyServiceOrderCreate):
+        row = ElderPackage(
+            tenant_id=tenant_id,
+            elder_id=payload.elder_id,
+            package_id=payload.package_id,
+            start_date=payload.start_date or date.today(),
+            status="active",
+        )
+        return self._save(db, row)
 
     def get_performance_summary(self, db: Session, tenant_id: str):
         today = date.today()
