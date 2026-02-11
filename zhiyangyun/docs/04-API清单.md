@@ -9,6 +9,9 @@
     - `GET /assets/occupancy-summary`
     - `POST /assets/beds/reconcile`
 - M2 长者：`/elders/*`
+  - 新增：
+    - `GET /elders/overview/summary`
+    - `GET /elders/audit/bed-sync`
 - M3 护理：`/care/*`
 - M4 用药：`/m4-medication/*`
 - M5 膳食：`/m5-meal/*`

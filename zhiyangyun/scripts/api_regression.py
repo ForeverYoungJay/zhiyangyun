@@ -69,7 +69,11 @@ class Client:
         elder = self._call("POST", "/elders", {"lead_id": lead["id"], "elder_no": f"ELD-{datetime.now().strftime('%H%M%S')}", "name": "回归老人", "gender": "male", "care_level": "L2"})
         self._call("GET", "/elders/leads")
         self._call("GET", "/elders")
+        elder_overview = self._call("GET", "/elders/overview/summary") or {}
+        self._check("m2.overview_ready", isinstance(elder_overview, dict) and "admission_conversion_rate" in elder_overview, f"overview={elder_overview}")
         self._call("POST", f"/elders/{elder['id']}/admit", {"building_id": building_id, "floor_id": floor["id"], "room_id": room["id"], "bed_id": bed["id"], "admission_date": str(date.today())})
+        bed_sync = self._call("GET", "/elders/audit/bed-sync") or {}
+        self._check("m2.bed_sync_audit_ready", isinstance(bed_sync, dict) and "issue_count" in bed_sync, f"audit={bed_sync}")
 
         item = self._call("POST", "/care/items", {"name": "洗浴", "category": "care", "unit_price": 88, "duration_min": 45})
         pkg = self._call("POST", "/care/packages", {"name": "日常护理包", "period": "daily"})

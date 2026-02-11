@@ -128,3 +128,40 @@ class ElderService:
 
     def logs(self, db: Session, tenant_id: str, elder_id: str):
         return db.scalars(select(ElderChangeLog).where(ElderChangeLog.tenant_id == tenant_id, ElderChangeLog.elder_id == elder_id)).all()
+
+    def overview(self, db: Session, tenant_id: str):
+        leads = db.scalars(select(CrmLead).where(CrmLead.tenant_id == tenant_id)).all()
+        elders = db.scalars(select(Elder).where(Elder.tenant_id == tenant_id)).all()
+
+        by_status = {"prospect": 0, "assessed": 0, "admitted": 0, "discharged": 0, "other": 0}
+        for e in elders:
+            if e.status in by_status:
+                by_status[e.status] += 1
+            else:
+                by_status["other"] += 1
+
+        conversion = round((by_status["admitted"] / len(elders)) * 100, 2) if elders else 0
+        return {
+            "lead_count": len(leads),
+            "elder_count": len(elders),
+            "admitted_count": by_status["admitted"],
+            "discharged_count": by_status["discharged"],
+            "status_breakdown": by_status,
+            "admission_conversion_rate": conversion,
+        }
+
+    def bed_sync_audit(self, db: Session, tenant_id: str):
+        elders = db.scalars(select(Elder).where(Elder.tenant_id == tenant_id, Elder.status == "admitted")).all()
+        issues = []
+        for e in elders:
+            if not e.bed_id:
+                issues.append({"elder_id": e.id, "elder_name": e.name, "issue": "在院长者未绑定床位"})
+                continue
+            bed = db.scalar(select(Bed).where(Bed.id == e.bed_id, Bed.tenant_id == tenant_id))
+            if not bed:
+                issues.append({"elder_id": e.id, "elder_name": e.name, "issue": "绑定床位不存在"})
+                continue
+            if bed.status != "occupied":
+                issues.append({"elder_id": e.id, "elder_name": e.name, "issue": f"床位状态异常: {bed.status}"})
+
+        return {"issue_count": len(issues), "issues": issues}

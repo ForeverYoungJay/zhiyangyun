@@ -55,3 +55,13 @@ def discharge(elder_id: str, payload: ElderDischarge, db: Session = Depends(get_
 @router.get("/{elder_id}/logs", response_model=ApiResponse)
 def logs(elder_id: str, db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
     return ApiResponse(data=service.logs(db, current.tenant_id, elder_id))
+
+
+@router.get("/overview/summary", response_model=ApiResponse)
+def overview_summary(db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
+    return ApiResponse(data=service.overview(db, current.tenant_id))
+
+
+@router.get("/audit/bed-sync", response_model=ApiResponse)
+def bed_sync_audit(db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
+    return ApiResponse(data=service.bed_sync_audit(db, current.tenant_id))

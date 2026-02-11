@@ -5,12 +5,23 @@
         <h2>M2 长者全周期管理</h2>
         <div class="desc">支持线索建档、入院/转床/退院联动，状态可视化展示。</div>
       </div>
-      <el-input v-model="keyword" placeholder="按姓名/编号筛选" style="width:240px" clearable />
+      <div style="display:flex; gap:8px;">
+        <el-input v-model="keyword" placeholder="按姓名/编号筛选" style="width:240px" clearable />
+        <el-button @click="runAudit">同步巡检</el-button>
+      </div>
     </div>
 
-    <el-alert type="info" :closable="false" show-icon title="流程提示：先录入线索和建档，再在 M1 中准备可用床位，最后进行入院/转床/退院操作。" />
+    <el-row :gutter="12" style="margin-bottom:12px;">
+      <el-col :span="6"><el-card>线索数：<b>{{ overview.lead_count }}</b></el-card></el-col>
+      <el-col :span="6"><el-card>长者档案：<b>{{ overview.elder_count }}</b></el-card></el-col>
+      <el-col :span="6"><el-card>在院人数：<b>{{ overview.admitted_count }}</b></el-card></el-col>
+      <el-col :span="6"><el-card>入院转化：<b>{{ overview.admission_conversion_rate }}%</b></el-card></el-col>
+    </el-row>
 
-    <el-row :gutter="16">
+    <el-alert type="info" :closable="false" show-icon title="流程提示：先录入线索和建档，再在 M1 中准备可用床位，最后进行入院/转床/退院操作。" />
+    <el-alert v-if="audit.issue_count" type="warning" :closable="false" show-icon :title="`发现 ${audit.issue_count} 条 M2↔M1 床位同步异常，请先修复后再派发护理任务`" style="margin-top:10px" />
+
+    <el-row :gutter="16" style="margin-top:12px;">
       <el-col :span="12">
         <el-card class="zy-card">
           <template #header>CRM 线索</template>
@@ -90,6 +101,8 @@ const rooms = ref<any[]>([])
 const beds = ref<any[]>([])
 const selectedElder = ref<any | null>(null)
 const keyword = ref('')
+const overview = ref<any>({ lead_count: 0, elder_count: 0, admitted_count: 0, admission_conversion_rate: 0 })
+const audit = ref<any>({ issue_count: 0, issues: [] })
 
 const lead = reactive({ name: '', phone: '', source_channel: 'online', notes: '' })
 const elder = reactive({ lead_id: '', elder_no: '', name: '', gender: 'male', care_level: 'L1' })
@@ -105,6 +118,8 @@ const refresh = async () => {
   floors.value = (await http.get('/assets/floors')).data.data
   rooms.value = (await http.get('/assets/rooms')).data.data
   beds.value = (await http.get('/assets/beds')).data.data
+  overview.value = (await http.get('/elders/overview/summary')).data.data
+  audit.value = (await http.get('/elders/audit/bed-sync')).data.data
 }
 
 const createLead = async () => {
@@ -122,6 +137,10 @@ const createElder = async () => {
   await refresh()
 }
 const pickElder = (row: any) => { selectedElder.value = row }
+const runAudit = async () => {
+  audit.value = (await http.get('/elders/audit/bed-sync')).data.data
+  ElMessage.success(`巡检完成，异常 ${audit.value.issue_count} 条`)
+}
 
 const admit = async () => {
   if (!selectedElder.value) return ElMessage.error('请先选择长者')
