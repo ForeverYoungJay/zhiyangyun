@@ -1,4 +1,12 @@
 <template>
+  <div class="page-shell">
+    <div class="page-title">
+      <div>
+        <h2>M1 资产与房间管理</h2>
+        <div class="desc">维护楼栋、楼层、房间、床位及二维码，为入院和护理流程提供基础资源。</div>
+      </div>
+      <el-button @click="refresh">刷新</el-button>
+    </div>
   <el-alert type="info" :closable="false" show-icon title="操作顺序建议：先创建楼栋→楼层→房间→床位，再切换床位状态。二维码值会自动生成。" style="margin-bottom:12px" />
   <el-row :gutter="16">
     <el-col :span="12">
@@ -57,6 +65,7 @@
       </el-card>
     </el-col>
   </el-row>
+  </div>
 </template>
 
 <script setup lang="ts">

@@ -1,0 +1,59 @@
+:root {
+  --zy-primary: #2f6bff;
+  --zy-primary-light: #e9f0ff;
+  --zy-success: #22b573;
+  --zy-warning: #ff9f1a;
+  --zy-danger: #f05656;
+  --zy-text: #1f2a37;
+  --zy-subtext: #667085;
+  --zy-bg: #f5f7fb;
+  --zy-card-radius: 12px;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  color: var(--zy-text);
+  background: var(--zy-bg);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+}
+
+.page-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.page-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #fff;
+  border-radius: var(--zy-card-radius);
+  border: 1px solid #ebeef5;
+}
+
+.page-title h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.page-title .desc {
+  margin-top: 4px;
+  color: var(--zy-subtext);
+  font-size: 13px;
+}
+
+.zy-card {
+  border-radius: var(--zy-card-radius) !important;
+  border: 1px solid #ebeef5;
+}
+
+.zy-tag-success { background: #ebfbf3; color: #158a56; border-color: #c6f2dc; }
+.zy-tag-warning { background: #fff8eb; color: #ad6f00; border-color: #ffe1aa; }
+.zy-tag-danger { background: #fff1f1; color: #c73939; border-color: #ffc5c5; }
+.zy-tag-info { background: #edf2ff; color: #355ac9; border-color: #cddaff; }
+
+.block-gap { margin-top: 12px; }
