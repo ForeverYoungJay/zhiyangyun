@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -8,6 +10,21 @@ from app.schemas.elder import LeadCreate, ElderCreate, ElderAdmit, ElderTransfer
 
 
 class ElderService:
+    def _generate_elder_no(self, db: Session, tenant_id: str) -> str:
+        prefix = datetime.now().strftime("ELD-%Y%m%d-")
+        like_pattern = f"{prefix}%"
+        all_today = db.scalars(
+            select(Elder.elder_no).where(Elder.tenant_id == tenant_id, Elder.elder_no.like(like_pattern))
+        ).all()
+        nums = []
+        for x in all_today:
+            try:
+                nums.append(int(str(x).split("-")[-1]))
+            except Exception:
+                continue
+        seq = (max(nums) + 1) if nums else 1
+        return f"{prefix}{seq:03d}"
+
     def list_leads(self, db: Session, tenant_id: str):
         return db.scalars(select(CrmLead).where(CrmLead.tenant_id == tenant_id)).all()
 
@@ -22,13 +39,15 @@ class ElderService:
         return db.scalars(select(Elder).where(Elder.tenant_id == tenant_id)).all()
 
     def create_elder(self, db: Session, tenant_id: str, payload: ElderCreate):
-        if db.scalar(select(Elder).where(Elder.tenant_id == tenant_id, Elder.elder_no == payload.elder_no)):
+        elder_no = payload.elder_no or self._generate_elder_no(db, tenant_id)
+
+        if db.scalar(select(Elder).where(Elder.tenant_id == tenant_id, Elder.elder_no == elder_no)):
             raise ValueError("elder_no 已存在，请使用唯一编号")
 
         item = Elder(
             tenant_id=tenant_id,
             lead_id=payload.lead_id,
-            elder_no=payload.elder_no,
+            elder_no=elder_no,
             name=payload.name,
             gender=payload.gender,
             birth_date=payload.birth_date,
