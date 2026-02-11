@@ -13,7 +13,7 @@ docker compose run --rm seed
 - 默认管理员：admin / Admin@123456
 
 ## 本次补齐的跨模块主链路
-建档 → 入院 → 床位绑定 → 护理任务生成 → 护理扫码完成自动扣费 → 家属查看账单/护理记录 → 家属问卷评价 → 绩效统计 → 看板展示
+建档 → 入院 → 床位绑定（库存）→ 护理服务项/套餐（商城）→ 护理任务（订单）→ 护理扫码完成自动扣费并计入账单/发票（余额）→ 家属查看账单/护理记录 → 家属问卷评价 → 绩效统计 → 看板展示
 
 ### 关键联动点
 - M2 入院/转床/退院增加状态机约束（仅 assessed/discharged 可入院；仅 admitted 可转床/退院）
@@ -60,7 +60,14 @@ python3 scripts/api_regression.py http://localhost:8000/api/v1
 - 每条接口 `PASS/FAIL + 方法 + 路径 + 错误信息`
 - 任一失败返回非 0（可直接接 CI）
 
-覆盖范围：已实现全部业务接口（登录、资产、长者、M3~M7、OA1~OA4、B1~B3、新增家属与看板接口）。
+覆盖范围：
+- 已实现全部业务接口（登录、资产、长者、M3~M7、OA1~OA4、B1~B3）
+- 关键联动校验（脚本内 `CHK`）：
+  - 护理任务成功生成（兼容 `/care/tasks/generate` 返回结构）
+  - 护理扫码完成后自动扣费，家属账单可见
+  - 护理记录写入并家属可见
+  - 家属问卷提交后可查询
+  - 看板绩效汇总接口可读
 
 ## UI / 功能验收清单
 ### 一、统一设计系统
@@ -92,6 +99,42 @@ python3 scripts/api_regression.py http://localhost:8000/api/v1
 ### 五、构建与联调
 - [ ] `cd web && npm run build` 通过
 - [ ] 关键链路手工验证：M1→M2→M3→M7→B2→B3
+
+## 最终验收步骤（可直接照抄）
+```bash
+# 1) 全量启动
+docker compose up --build -d
+
+# 2) 迁移 + 种子
+cd backend && alembic upgrade head && cd ..
+docker compose run --rm seed
+
+# 3) 关键 API 回归（含全链路 CHK）
+python3 scripts/api_regression.py
+
+# 4) 前端构建
+cd web && npm install && npm run build && cd ..
+
+# 5) 关键接口冒烟
+curl -s http://localhost:8000/health
+curl -s -X POST http://localhost:8000/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"Admin@123456"}'
+```
+
+## 故障排查
+- `api_regression.py` 在任务生成处报 `KeyError: 'id'`
+  - 现已修复后端 `CareService.generate_tasks`：提交后逐条 `db.refresh(task)`，确保返回结构包含 `id`。
+  - 脚本也增加兼容：优先使用 generate 返回值，必要时回退到 `/care/tasks` 列表取 `id`。
+
+- 前端构建报 `vue-tsc: command not found`
+  - 先执行 `cd web && npm install` 再 `npm run build`。
+
+- 首次启动接口 401/空数据
+  - 确认已执行 `docker compose run --rm seed`，并使用默认账号 `admin / Admin@123456`。
+
+- 看板无数据
+  - 先跑一轮 `python3 scripts/api_regression.py`，脚本会自动生成联动业务数据。
 
 ## 迁移说明
 本次新增迁移：

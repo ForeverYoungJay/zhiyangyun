@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import json
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from urllib import request, error
 
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8000/api/v1"
@@ -29,6 +29,16 @@ class Client:
             self.results.append((method, path, False, f"HTTP {e.code}: {msg}"))
         except Exception as e:
             self.results.append((method, path, False, str(e)))
+        return None
+
+    def _check(self, name: str, condition: bool, detail: str = ""):
+        self.results.append(("CHK", name, bool(condition), detail if not condition else ""))
+
+    def _first_id(self, rows):
+        if isinstance(rows, list):
+            for row in rows:
+                if isinstance(row, dict) and row.get("id"):
+                    return row["id"]
         return None
 
     def run(self):
@@ -63,10 +73,11 @@ class Client:
         elder_pkg = self._call("POST", "/care/elder-packages", {"elder_id": elder["id"], "package_id": pkg["id"], "start_date": str(date.today())})
         self._call("GET", "/care/items")
         self._call("GET", "/care/packages")
-        tasks = self._call("POST", "/care/tasks/generate", {"elder_package_id": elder_pkg["id"], "scheduled_at": datetime.utcnow().isoformat()}) or []
-        self._call("GET", "/care/tasks")
-        if tasks:
-            task_id = tasks[0]["id"]
+        tasks = self._call("POST", "/care/tasks/generate", {"elder_package_id": elder_pkg["id"], "scheduled_at": datetime.now(timezone.utc).isoformat()}) or []
+        listed_tasks = self._call("GET", "/care/tasks") or []
+        task_id = self._first_id(tasks) or self._first_id(listed_tasks)
+        self._check("care.task_generated", bool(task_id), f"tasks={tasks}")
+        if task_id:
             self._call("POST", f"/care/tasks/{task_id}/scan-in", {"qr_value": bed["qr_code"]})
             self._call("POST", f"/care/tasks/{task_id}/scan-out", {"qr_value": bed["qr_code"]})
             self._call("POST", f"/care/tasks/{task_id}/supervise", {"score": 96})
@@ -111,14 +122,18 @@ class Client:
         self._call("POST", "/b2-family/visits", {"family_id": family["id"], "visit_date": str(date.today())})
         self._call("GET", "/b2-family/accounts")
         self._call("GET", "/b2-family/visits")
-        self._call("GET", f"/b2-family/elders/{elder['id']}/bills")
-        self._call("GET", f"/b2-family/elders/{elder['id']}/care-records")
+        family_bills = self._call("GET", f"/b2-family/elders/{elder['id']}/bills") or []
+        family_records = self._call("GET", f"/b2-family/elders/{elder['id']}/care-records") or []
+        self._check("linkage.auto_billing_visible_to_family", len(family_bills) > 0, f"bills={family_bills}")
+        self._check("linkage.care_record_visible_to_family", len(family_records) > 0, f"records={family_records}")
         self._call("POST", "/b2-family/surveys", {"elder_id": elder["id"], "family_id": family["id"], "score": 5, "comment": "满意"})
-        self._call("GET", f"/b2-family/surveys?elder_id={elder['id']}")
+        surveys = self._call("GET", f"/b2-family/surveys?elder_id={elder['id']}") or []
+        self._check("linkage.family_survey_recorded", len(surveys) > 0, f"surveys={surveys}")
 
         self._call("POST", "/b3-dashboard/metrics", {"metric_date": str(date.today()), "occupancy_rate": 86.5, "revenue": 1000, "alerts": 2})
         self._call("GET", "/b3-dashboard/metrics")
-        self._call("GET", "/b3-dashboard/performance-summary")
+        summary = self._call("GET", "/b3-dashboard/performance-summary") or {}
+        self._check("linkage.performance_summary", isinstance(summary, dict) and len(summary) > 0, f"summary={summary}")
 
         self._call("GET", f"/elders/{elder['id']}/logs")
         self._call("POST", f"/elders/{elder['id']}/discharge", {"discharge_date": str(date.today()), "note": "脚本退院"})

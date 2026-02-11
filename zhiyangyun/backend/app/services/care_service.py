@@ -88,6 +88,8 @@ class CareService:
                 db.add(t)
                 tasks.append(t)
         db.commit()
+        for t in tasks:
+            db.refresh(t)
         return tasks
 
     def scan_in(self, db: Session, tenant_id: str, task_id: str, qr_value: str):
