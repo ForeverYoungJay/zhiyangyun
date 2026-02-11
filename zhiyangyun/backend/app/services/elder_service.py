@@ -1,4 +1,5 @@
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.asset import Bed
@@ -21,6 +22,9 @@ class ElderService:
         return db.scalars(select(Elder).where(Elder.tenant_id == tenant_id)).all()
 
     def create_elder(self, db: Session, tenant_id: str, payload: ElderCreate):
+        if db.scalar(select(Elder).where(Elder.tenant_id == tenant_id, Elder.elder_no == payload.elder_no)):
+            raise ValueError("elder_no 已存在，请使用唯一编号")
+
         item = Elder(
             tenant_id=tenant_id,
             lead_id=payload.lead_id,
@@ -35,7 +39,11 @@ class ElderService:
         db.add(item)
         db.flush()
         db.add(ElderChangeLog(tenant_id=tenant_id, elder_id=item.id, action="create", detail="建档完成"))
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise ValueError("建档失败：请检查长者编号是否唯一")
         db.refresh(item)
         return item
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentUser, get_current_user
@@ -28,7 +28,10 @@ def list_elders(db: Session = Depends(get_db), current: CurrentUser = Depends(ge
 
 @router.post("", response_model=ApiResponse)
 def create_elder(payload: ElderCreate, db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
-    return ApiResponse(message="created", data=service.create_elder(db, current.tenant_id, payload))
+    try:
+        return ApiResponse(message="created", data=service.create_elder(db, current.tenant_id, payload))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/{elder_id}/admit", response_model=ApiResponse)

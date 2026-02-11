@@ -1,5 +1,5 @@
 from datetime import date
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 
 class LeadCreate(BaseModel):
@@ -11,12 +11,19 @@ class LeadCreate(BaseModel):
 
 class ElderCreate(BaseModel):
     lead_id: str | None = None
-    elder_no: str
-    name: str
+    elder_no: str = Field(min_length=1)
+    name: str = Field(min_length=1)
     gender: str = "unknown"
     birth_date: date | None = None
     id_card: str = ""
     care_level: str = "L1"
+
+    @field_validator("lead_id", mode="before")
+    @classmethod
+    def empty_str_to_none(cls, v):
+        if v == "":
+            return None
+        return v
 
 
 class ElderAdmit(BaseModel):
