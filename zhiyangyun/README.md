@@ -1,9 +1,10 @@
-# 智慧养老平台（已覆盖 A1-M1~M7、A2-OA1~OA4、B1~B3 最小闭环）
+# 智慧养老平台（跨模块联动版）
 
 ## 一键启动
 ```bash
 docker compose up --build -d
-# 首次启动后执行种子数据
+# 首次启动或模型变更后执行
+cd backend && alembic upgrade head && cd ..
 docker compose run --rm seed
 ```
 
@@ -11,70 +12,64 @@ docker compose run --rm seed
 - Web: http://localhost:5173
 - 默认管理员：admin / Admin@123456
 
-## 本阶段能力
-- 多租户 tenant_id 隔离（业务查询均按 token 中 tenant_id）
-- JWT 登录鉴权
-- 统一返回格式：`{success, message, data}`
+## 本次补齐的跨模块主链路
+建档 → 入院 → 床位绑定 → 护理任务生成 → 护理扫码完成自动扣费 → 家属查看账单/护理记录 → 家属问卷评价 → 绩效统计 → 看板展示
 
-### A1 模块
-- M1 资产与房间管理
-- M2 长者全周期管理
-- M3 服务与护理标准化
-- M4 用药管理：医嘱/执行记录
-- M5 膳食管理：食谱计划/点餐
-- M6 健康档案：生命体征/评估
-- M7 费用管理：计费项目/账单
+### 关键联动点
+- M2 入院/转床/退院增加状态机约束（仅 assessed/discharged 可入院；仅 admitted 可转床/退院）
+- M3 扫码校验修复：扫码值必须匹配长者当前床位 `bed.qr_code`
+- M3 任务状态机约束：`pending -> in_progress -> completed`
+- M3 任务完成自动联动：
+  - 自动新增 M7 计费明细（BillingItem）
+  - 自动滚动累计当月发票（BillingInvoice.total_amount）
+  - 自动写入 B2 家属护理记录（FamilyCareRecord）
+- B2 新增家属侧查询接口：账单、护理记录、问卷
+- B3 新增绩效汇总接口：任务完成数、监督均分、家属满意度、今日营收、床位占用率
 
-### A2 OA 模块
-- OA1 排班：班次模板/排班分配
-- OA2 审批：申请单流转
-- OA3 通知：站内通知发送
-- OA4 培训：课程/学习记录
+## API 路由概览
+- A1: `/api/v1/m4-medication/*`, `/m5-meal/*`, `/m6-health/*`, `/m7-billing/*`
+- A2: `/api/v1/oa1-shift/*`, `/oa2-approval/*`, `/oa3-notification/*`, `/oa4-training/*`
+- B: `/api/v1/b1-miniapp/*`, `/b2-family/*`, `/b3-dashboard/*`
 
-### B 模块
-- B1 小程序服务闭环：服务请求工单
-- B2 家属门户闭环：家属账号/探视预约
-- B3 运营看板闭环：每日指标入库
+本次新增：
+- `GET /api/v1/b2-family/elders/{elder_id}/bills`
+- `GET /api/v1/b2-family/elders/{elder_id}/care-records`
+- `GET /api/v1/b2-family/surveys?elder_id=...`
+- `POST /api/v1/b2-family/surveys`
+- `GET /api/v1/b3-dashboard/performance-summary`
 
-## 数据迁移
+## 前端联调入口
+- `M2 长者全周期管理`：建档+入院/转床/退院
+- `M3 服务与护理标准化`：任务扫码开始/完成、监督评分（扫码值会自动取长者床位二维码）
+- `A1-M7 费用管理`：可见自动扣费后的明细与发票
+- `B2 家属门户`：查看账单、护理记录、提交问卷评价
+- `B3 运营看板`：展示实时绩效汇总 + 历史指标
+
+## 自动化 API 回归
+脚本位置：`scripts/api_regression.py`
+
+执行：
+```bash
+python3 scripts/api_regression.py
+# 或指定地址
+python3 scripts/api_regression.py http://localhost:8000/api/v1
+```
+
+输出格式：
+- 总计 `total/pass/fail`
+- 每条接口 `PASS/FAIL + 方法 + 路径 + 错误信息`
+- 任一失败返回非 0（可直接接 CI）
+
+覆盖范围：已实现全部业务接口（登录、资产、长者、M3~M7、OA1~OA4、B1~B3、新增家属与看板接口）。
+
+## 迁移说明
+本次新增迁移：
+- `2026021115_linkage_enhance.py`
+  - `family_care_records`
+  - `family_surveys`
+
+如本地已启动旧库，请先执行：
 ```bash
 cd backend
 alembic upgrade head
 ```
-
-## 新增 API 路由索引（本次）
-- `/api/v1/m4-medication/*`
-- `/api/v1/m5-meal/*`
-- `/api/v1/m6-health/*`
-- `/api/v1/m7-billing/*`
-- `/api/v1/oa1-shift/*`
-- `/api/v1/oa2-approval/*`
-- `/api/v1/oa3-notification/*`
-- `/api/v1/oa4-training/*`
-- `/api/v1/b1-miniapp/*`
-- `/api/v1/b2-family/*`
-- `/api/v1/b3-dashboard/*`
-
-## Web 页面（最小闭环）
-登录后左侧菜单可进入对应页面，均提供“新增 + 列表”闭环。
-
-## 自测步骤（逐模块）
-1. 启动并登录，获取 TOKEN：
-```bash
-curl -X POST http://localhost:8000/api/v1/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"username":"admin","password":"Admin@123456"}'
-```
-2. 每个模块先 POST 再 GET 验证：
-   - M4: `POST /m4-medication/orders` -> `GET /m4-medication/orders`
-   - M5: `POST /m5-meal/plans` -> `GET /m5-meal/plans`
-   - M6: `POST /m6-health/vitals` -> `GET /m6-health/vitals`
-   - M7: `POST /m7-billing/items` -> `GET /m7-billing/items`
-   - OA1: `POST /oa1-shift/templates` -> `GET /oa1-shift/templates`
-   - OA2: `POST /oa2-approval/requests` -> `GET /oa2-approval/requests`
-   - OA3: `POST /oa3-notification/messages` -> `GET /oa3-notification/messages`
-   - OA4: `POST /oa4-training/courses` -> `GET /oa4-training/courses`
-   - B1: `POST /b1-miniapp/requests` -> `GET /b1-miniapp/requests`
-   - B2: `POST /b2-family/accounts` -> `GET /b2-family/accounts`
-   - B3: `POST /b3-dashboard/metrics` -> `GET /b3-dashboard/metrics`
-3. Web 端逐项进入菜单，执行新增后确认表格出现新记录。

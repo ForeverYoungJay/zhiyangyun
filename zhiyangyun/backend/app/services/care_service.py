@@ -4,6 +4,9 @@ from sqlalchemy.orm import Session
 
 from app.models.asset import Bed
 from app.models.care import ServiceItem, CarePackage, CarePackageItem, ElderPackage, CareTask
+from app.models.elder import Elder
+from app.models.medical import BillingItem, BillingInvoice
+from app.models.business import FamilyCareRecord
 from app.schemas.care import (
     ServiceItemCreate,
     CarePackageCreate,
@@ -89,10 +92,17 @@ class CareService:
 
     def scan_in(self, db: Session, tenant_id: str, task_id: str, qr_value: str):
         task = db.scalar(select(CareTask).where(CareTask.id == task_id, CareTask.tenant_id == tenant_id))
-        if not task:
+        if not task or task.status != "pending":
             return None
-        bed = db.scalar(select(Bed).where(Bed.id == task.qr_scan_in, Bed.tenant_id == tenant_id))
-        _ = bed
+
+        elder = db.scalar(select(Elder).where(Elder.id == task.elder_id, Elder.tenant_id == tenant_id))
+        if not elder or not elder.bed_id:
+            return None
+
+        bed = db.scalar(select(Bed).where(Bed.id == elder.bed_id, Bed.tenant_id == tenant_id))
+        if not bed or bed.qr_code != qr_value:
+            return None
+
         task.status = "in_progress"
         task.started_at = datetime.utcnow()
         task.qr_scan_in = qr_value
@@ -102,18 +112,54 @@ class CareService:
 
     def scan_out(self, db: Session, tenant_id: str, task_id: str, qr_value: str):
         task = db.scalar(select(CareTask).where(CareTask.id == task_id, CareTask.tenant_id == tenant_id))
-        if not task:
+        if not task or task.status != "in_progress":
             return None
+
+        elder = db.scalar(select(Elder).where(Elder.id == task.elder_id, Elder.tenant_id == tenant_id))
+        bed = db.scalar(select(Bed).where(Bed.id == elder.bed_id, Bed.tenant_id == tenant_id)) if elder and elder.bed_id else None
+        if not bed or bed.qr_code != qr_value:
+            return None
+
+        item = db.scalar(select(ServiceItem).where(ServiceItem.id == task.item_id, ServiceItem.tenant_id == tenant_id))
+        if not item:
+            return None
+
         task.status = "completed"
         task.completed_at = datetime.utcnow()
         task.qr_scan_out = qr_value
+
+        billing = BillingItem(
+            tenant_id=tenant_id,
+            elder_id=task.elder_id,
+            item_name=f"护理任务:{item.name}",
+            amount=item.unit_price,
+            charged_on=datetime.utcnow().date(),
+            status="unpaid",
+        )
+        db.add(billing)
+
+        period = datetime.utcnow().strftime("%Y-%m")
+        invoice = db.scalar(select(BillingInvoice).where(BillingInvoice.tenant_id == tenant_id, BillingInvoice.elder_id == task.elder_id, BillingInvoice.period_month == period))
+        if not invoice:
+            invoice = BillingInvoice(tenant_id=tenant_id, elder_id=task.elder_id, period_month=period, total_amount=0, paid_amount=0, status="open")
+            db.add(invoice)
+        invoice.total_amount = float(invoice.total_amount) + float(item.unit_price)
+
+        care_record = FamilyCareRecord(
+            tenant_id=tenant_id,
+            elder_id=task.elder_id,
+            task_id=task.id,
+            content=f"{item.name}已完成，自动扣费{float(item.unit_price):.2f}元",
+        )
+        db.add(care_record)
+
         db.commit()
         db.refresh(task)
         return task
 
     def supervise(self, db: Session, tenant_id: str, task_id: str, score: int):
         task = db.scalar(select(CareTask).where(CareTask.id == task_id, CareTask.tenant_id == tenant_id))
-        if not task:
+        if not task or task.status != "completed":
             return None
         task.supervise_score = score
         db.commit()

@@ -63,6 +63,7 @@ import http from '../../api/http'
 const items = ref<any[]>([])
 const packages = ref<any[]>([])
 const elders = ref<any[]>([])
+const beds = ref<any[]>([])
 const subs = ref<any[]>([])
 const tasks = ref<any[]>([])
 
@@ -76,6 +77,7 @@ const refresh = async () => {
   items.value = (await http.get('/care/items')).data.data
   packages.value = (await http.get('/care/packages')).data.data
   elders.value = (await http.get('/elders')).data.data
+  beds.value = (await http.get('/assets/beds')).data.data
   tasks.value = (await http.get('/care/tasks')).data.data
 }
 
@@ -88,8 +90,15 @@ const subscribe = async () => {
   subs.value.unshift(resp.data.data)
 }
 const generate = async () => { await http.post('/care/tasks/generate', { ...gen, scheduled_at: new Date().toISOString() }); await refresh() }
-const scanIn = async (id: string) => { await http.post(`/care/tasks/${id}/scan-in`, { qr_value: 'QR:ROOM:SIMULATED' }); await refresh() }
-const scanOut = async (id: string) => { await http.post(`/care/tasks/${id}/scan-out`, { qr_value: 'QR:ROOM:SIMULATED' }); await refresh() }
+const getTaskBedQr = (taskId: string) => {
+  const task = tasks.value.find((t) => t.id === taskId)
+  const elder = elders.value.find((e) => e.id === task?.elder_id)
+  const bed = beds.value.find((b) => b.id === elder?.bed_id)
+  return bed?.qr_code || ''
+}
+
+const scanIn = async (id: string) => { await http.post(`/care/tasks/${id}/scan-in`, { qr_value: getTaskBedQr(id) }); await refresh() }
+const scanOut = async (id: string) => { await http.post(`/care/tasks/${id}/scan-out`, { qr_value: getTaskBedQr(id) }); await refresh() }
 const supervise = async (id: string) => { await http.post(`/care/tasks/${id}/supervise`, { score: 95 }); await refresh() }
 
 onMounted(refresh)

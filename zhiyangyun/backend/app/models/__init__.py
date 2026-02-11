@@ -5,7 +5,7 @@ from app.models.elder import CrmLead, Elder, ElderChangeLog
 from app.models.care import ServiceItem, CarePackage, CarePackageItem, ElderPackage, CareTask
 from app.models.medical import MedicationOrder, MedicationExecution, MealPlan, MealOrder, VitalSignRecord, HealthAssessment, BillingItem, BillingInvoice
 from app.models.oa import ShiftTemplate, ShiftAssignment, ApprovalRequest, NotificationMessage, TrainingCourse, TrainingRecord
-from app.models.business import MiniappServiceRequest, FamilyAccount, FamilyVisit, DashboardMetric
+from app.models.business import MiniappServiceRequest, FamilyAccount, FamilyVisit, DashboardMetric, FamilyCareRecord, FamilySurvey
 
 __all__ = [
     "User",
@@ -43,4 +43,6 @@ __all__ = [
     "FamilyAccount",
     "FamilyVisit",
     "DashboardMetric",
+    "FamilyCareRecord",
+    "FamilySurvey",
 ]

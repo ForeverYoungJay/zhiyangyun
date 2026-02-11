@@ -19,3 +19,8 @@ def list_metrics(db: Session = Depends(get_db), current: CurrentUser = Depends(g
 @router.post("/metrics", response_model=ApiResponse)
 def create_metric(payload: DashboardMetricCreate, db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
     return ApiResponse(message="created", data=service.create_metric(db, current.tenant_id, payload))
+
+
+@router.get("/performance-summary", response_model=ApiResponse)
+def performance_summary(db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
+    return ApiResponse(data=service.get_performance_summary(db, current.tenant_id))

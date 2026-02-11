@@ -1,5 +1,5 @@
 from datetime import datetime, date
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ServiceItemCreate(BaseModel):
@@ -32,8 +32,8 @@ class TaskGenerateRequest(BaseModel):
 
 
 class TaskScanRequest(BaseModel):
-    qr_value: str
+    qr_value: str = Field(min_length=3)
 
 
 class TaskSuperviseRequest(BaseModel):
-    score: int
+    score: int = Field(ge=0, le=100)

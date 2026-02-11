@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import CurrentUser, get_current_user
 from app.db.session import get_db
 from app.schemas.common import ApiResponse
-from app.schemas.business import FamilyAccountCreate, FamilyVisitCreate
+from app.schemas.business import FamilyAccountCreate, FamilyVisitCreate, FamilySurveyCreate
 from app.services.business_service import BusinessService
 
 router = APIRouter(prefix="/b2-family", tags=["B2"])
@@ -29,3 +29,23 @@ def list_visits(db: Session = Depends(get_db), current: CurrentUser = Depends(ge
 @router.post("/visits", response_model=ApiResponse)
 def create_visit(payload: FamilyVisitCreate, db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
     return ApiResponse(message="created", data=service.create_visit(db, current.tenant_id, payload))
+
+
+@router.get("/elders/{elder_id}/bills", response_model=ApiResponse)
+def elder_bills(elder_id: str, db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
+    return ApiResponse(data=service.list_family_bills(db, current.tenant_id, elder_id))
+
+
+@router.get("/elders/{elder_id}/care-records", response_model=ApiResponse)
+def elder_care_records(elder_id: str, db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
+    return ApiResponse(data=service.list_family_care_records(db, current.tenant_id, elder_id))
+
+
+@router.get("/surveys", response_model=ApiResponse)
+def list_surveys(elder_id: str | None = None, db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
+    return ApiResponse(data=service.list_surveys(db, current.tenant_id, elder_id))
+
+
+@router.post("/surveys", response_model=ApiResponse)
+def create_survey(payload: FamilySurveyCreate, db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
+    return ApiResponse(message="created", data=service.create_survey(db, current.tenant_id, payload))

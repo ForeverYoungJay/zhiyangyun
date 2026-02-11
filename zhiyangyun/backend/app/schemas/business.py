@@ -1,5 +1,5 @@
 from datetime import date
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class MiniappServiceRequestCreate(BaseModel):
@@ -25,3 +25,10 @@ class DashboardMetricCreate(BaseModel):
     occupancy_rate: float = 0
     revenue: float = 0
     alerts: int = 0
+
+
+class FamilySurveyCreate(BaseModel):
+    elder_id: str
+    family_id: str | None = None
+    score: int = Field(default=5, ge=1, le=5)
+    comment: str = ""

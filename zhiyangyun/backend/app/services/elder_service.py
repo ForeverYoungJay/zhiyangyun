@@ -33,6 +33,7 @@ class ElderService:
             status="assessed",
         )
         db.add(item)
+        db.flush()
         db.add(ElderChangeLog(tenant_id=tenant_id, elder_id=item.id, action="create", detail="建档完成"))
         db.commit()
         db.refresh(item)
@@ -42,6 +43,8 @@ class ElderService:
         elder = db.scalar(select(Elder).where(Elder.id == elder_id, Elder.tenant_id == tenant_id))
         bed = db.scalar(select(Bed).where(Bed.id == payload.bed_id, Bed.tenant_id == tenant_id))
         if not elder or not bed:
+            return None
+        if elder.status not in ["assessed", "discharged"]:
             return None
         if bed.status not in ["vacant", "reserved"]:
             return None
@@ -61,7 +64,7 @@ class ElderService:
     def transfer(self, db: Session, tenant_id: str, elder_id: str, payload: ElderTransfer):
         elder = db.scalar(select(Elder).where(Elder.id == elder_id, Elder.tenant_id == tenant_id))
         new_bed = db.scalar(select(Bed).where(Bed.id == payload.bed_id, Bed.tenant_id == tenant_id))
-        if not elder or not new_bed or new_bed.status != "vacant":
+        if not elder or elder.status != "admitted" or not new_bed or new_bed.status != "vacant":
             return None
 
         if elder.bed_id:
@@ -81,7 +84,7 @@ class ElderService:
 
     def discharge(self, db: Session, tenant_id: str, elder_id: str, payload: ElderDischarge):
         elder = db.scalar(select(Elder).where(Elder.id == elder_id, Elder.tenant_id == tenant_id))
-        if not elder:
+        if not elder or elder.status != "admitted":
             return None
 
         if elder.bed_id:
