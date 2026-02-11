@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, CurrentUser
@@ -66,5 +66,20 @@ def update_bed_status(
     db: Session = Depends(get_db),
     current: CurrentUser = Depends(get_current_user),
 ):
-    data = service.update_bed_status(db, current.tenant_id, bed_id, payload.status)
+    try:
+        data = service.update_bed_status(db, current.tenant_id, bed_id, payload.status)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return ApiResponse(message="updated", data=data)
+
+
+@router.get("/occupancy-summary", response_model=ApiResponse)
+def occupancy_summary(db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
+    data = service.occupancy_summary(db, current.tenant_id)
+    return ApiResponse(data=data)
+
+
+@router.post("/beds/reconcile", response_model=ApiResponse)
+def reconcile_bed_status(db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
+    data = service.reconcile_bed_status(db, current.tenant_id)
+    return ApiResponse(message="reconciled", data=data)

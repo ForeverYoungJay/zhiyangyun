@@ -60,6 +60,10 @@ class Client:
         self._call("GET", "/assets/beds")
         self._call("PATCH", f"/assets/beds/{bed['id']}/status", {"status": "reserved"})
         self._call("PATCH", f"/assets/beds/{bed['id']}/status", {"status": "vacant"})
+        occupancy = self._call("GET", "/assets/occupancy-summary") or {}
+        self._check("m1.occupancy_summary_ready", isinstance(occupancy, dict) and "occupancy_rate" in occupancy, f"occupancy={occupancy}")
+        reconcile = self._call("POST", "/assets/beds/reconcile") or {}
+        self._check("m1.reconcile_api_ready", isinstance(reconcile, dict) and "fixed_count" in reconcile, f"reconcile={reconcile}")
 
         lead = self._call("POST", "/elders/leads", {"name": "回归老人", "phone": "13900000000", "source_channel": "script", "notes": "api"})
         elder = self._call("POST", "/elders", {"lead_id": lead["id"], "elder_no": f"ELD-{datetime.now().strftime('%H%M%S')}", "name": "回归老人", "gender": "male", "care_level": "L2"})

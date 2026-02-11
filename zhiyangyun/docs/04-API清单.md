@@ -5,6 +5,9 @@
 
 ## A1
 - M1 资产：`/assets/*`
+  - 新增：
+    - `GET /assets/occupancy-summary`
+    - `POST /assets/beds/reconcile`
 - M2 长者：`/elders/*`
 - M3 护理：`/care/*`
 - M4 用药：`/m4-medication/*`

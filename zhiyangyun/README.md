@@ -25,6 +25,9 @@ docker compose run --rm seed
 7. **紧急任务与周期下发**：支持紧急一键下发、按天/月/季度/年/自定义次数批量下发（`/care/tasks/dispatch`）。
 
 ### 关键联动点
+- M1 新增床位运营视图：`GET /assets/occupancy-summary`（入住率、空床、异常床位）
+- M1 新增一键对账修复：`POST /assets/beds/reconcile`（自动修正“床位状态 vs 在住长者绑定”不一致）
+- M1 限制手工把床位设为 occupied：需先由 M2 入院/转床绑定在住长者
 - M2 入院/转床/退院增加状态机约束（仅 assessed/discharged 可入院；仅 admitted 可转床/退院）
 - M3 扫码校验修复：扫码值必须匹配长者当前床位 `bed.qr_code`
 - M3 任务状态机约束：`pending -> in_progress -> completed`
@@ -59,6 +62,8 @@ docker compose run --rm seed
 - `POST /api/v1/care/tasks/{id}/dean-review`
 - `POST /api/v1/care/tasks/dispatch`
 - `GET /api/v1/care/caregivers/{id}/performance`
+- `GET /api/v1/assets/occupancy-summary`
+- `POST /api/v1/assets/beds/reconcile`
 
 ## 前端联调入口
 - `M2 长者全周期管理`：建档+入院/转床/退院
