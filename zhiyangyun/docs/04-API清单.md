@@ -13,6 +13,8 @@
     - `GET /elders/overview/summary`
     - `GET /elders/audit/bed-sync`
 - M3 护理：`/care/*`
+  - 新增：
+    - `GET /care/governance-summary`
 - M4 用药：`/m4-medication/*`
 - M5 膳食：`/m5-meal/*`
 - M6 健康：`/m6-health/*`

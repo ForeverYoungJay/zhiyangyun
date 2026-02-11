@@ -68,6 +68,7 @@ docker compose run --rm seed
 - `POST /api/v1/assets/beds/reconcile`
 - `GET /api/v1/elders/overview/summary`
 - `GET /api/v1/elders/audit/bed-sync`
+- `GET /api/v1/care/governance-summary`
 
 ## 前端联调入口
 - `M2 长者全周期管理`：建档+入院/转床/退院

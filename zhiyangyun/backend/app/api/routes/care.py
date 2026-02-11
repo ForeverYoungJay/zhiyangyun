@@ -162,3 +162,8 @@ def dean_review(task_id: str, payload: DeanReviewRequest, db: Session = Depends(
 @router.get("/caregivers/{caregiver_id}/performance", response_model=ApiResponse)
 def get_performance(caregiver_id: str, db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
     return ApiResponse(data=service.get_performance(db, current.tenant_id, caregiver_id))
+
+
+@router.get("/governance-summary", response_model=ApiResponse)
+def governance_summary(db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
+    return ApiResponse(data=service.governance_summary(db, current.tenant_id))

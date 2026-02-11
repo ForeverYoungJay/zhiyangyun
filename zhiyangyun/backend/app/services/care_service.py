@@ -385,3 +385,26 @@ class CareService:
 
     def get_performance(self, db: Session, tenant_id: str, caregiver_id: str):
         return self._get_or_init_perf(db, tenant_id, caregiver_id)
+
+    def governance_summary(self, db: Session, tenant_id: str):
+        tasks = db.scalars(select(CareTask).where(CareTask.tenant_id == tenant_id)).all()
+        now = datetime.utcnow()
+        pending = [t for t in tasks if t.status == "pending"]
+        in_progress = [t for t in tasks if t.status == "in_progress"]
+        completed = [t for t in tasks if t.status == "completed"]
+        overdue = [t for t in pending if t.scheduled_at and t.scheduled_at < now]
+        durations = [t.execution_seconds for t in completed if t.execution_seconds]
+        avg_seconds = round(sum(durations) / len(durations), 2) if durations else 0
+
+        billed_tasks = db.scalars(
+            select(BillingItem).where(BillingItem.tenant_id == tenant_id, BillingItem.item_name.like("护理任务:%"))
+        ).all()
+
+        return {
+            "pending_count": len(pending),
+            "in_progress_count": len(in_progress),
+            "completed_count": len(completed),
+            "overdue_count": len(overdue),
+            "avg_execution_seconds": avg_seconds,
+            "auto_billed_count": len(billed_tasks),
+        }

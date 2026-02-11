@@ -8,6 +8,15 @@
       <el-button @click="refresh">刷新</el-button>
     </div>
 
+    <el-row :gutter="12" style="margin-bottom:12px;">
+      <el-col :span="4"><el-card>待执行：<b>{{ summary.pending_count }}</b></el-card></el-col>
+      <el-col :span="4"><el-card>执行中：<b>{{ summary.in_progress_count }}</b></el-card></el-col>
+      <el-col :span="4"><el-card>已完成：<b>{{ summary.completed_count }}</b></el-card></el-col>
+      <el-col :span="4"><el-card>逾期：<b>{{ summary.overdue_count }}</b></el-card></el-col>
+      <el-col :span="4"><el-card>均耗时：<b>{{ summary.avg_execution_seconds }}s</b></el-card></el-col>
+      <el-col :span="4"><el-card>自动扣费：<b>{{ summary.auto_billed_count }}</b></el-card></el-col>
+    </el-row>
+
     <el-row :gutter="16">
       <el-col :span="8">
         <el-card class="zy-card">
@@ -110,6 +119,7 @@ const beds = ref<any[]>([])
 const subs = ref<any[]>([])
 const tasks = ref<any[]>([])
 const board = ref<any[]>([])
+const summary = ref<any>({ pending_count: 0, in_progress_count: 0, completed_count: 0, overdue_count: 0, avg_execution_seconds: 0, auto_billed_count: 0 })
 
 const item = reactive({ name: '', category: 'care', unit_price: 50, duration_min: 30 })
 const pkg = reactive({ name: '', period: 'daily', default_months: 6 })
@@ -126,6 +136,7 @@ const refresh = async () => {
   users.value = (await http.get('/care/caregivers')).data.data || []
   tasks.value = (await http.get('/care/tasks')).data.data
   board.value = (await http.get('/care/tasks/board')).data.data
+  summary.value = (await http.get('/care/governance-summary')).data.data
 }
 
 const createItem = async () => { await http.post('/care/items', item); item.name = ''; await refresh() }

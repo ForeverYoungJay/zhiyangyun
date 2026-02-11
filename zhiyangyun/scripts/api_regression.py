@@ -102,6 +102,9 @@ class Client:
             self._check("care.performance_deducted", perf.get("score", 100) <= 75, f"perf={perf}")
             self._check("care.rotation_suggestion", bool(perf.get("rotation_suggestion")), f"perf={perf}")
 
+        governance = self._call("GET", "/care/governance-summary") or {}
+        self._check("m3.governance_summary_ready", isinstance(governance, dict) and "overdue_count" in governance, f"governance={governance}")
+
         self._call("POST", "/care/tasks/round", {"elder_id": elder["id"], "item_id": item["id"], "round_type": "nursing_round", "scheduled_at": datetime.now(timezone.utc).isoformat()})
         self._call("POST", "/care/tasks/dispatch", {"elder_package_id": elder_pkg["id"], "dispatch_type": "emergency", "frequency": "day", "custom_times": 1, "start_at": datetime.now(timezone.utc).isoformat()})
         self._call("POST", "/care/tasks/dispatch", {"elder_package_id": elder_pkg["id"], "dispatch_type": "periodic", "frequency": "custom", "custom_times": 2, "start_at": datetime.now(timezone.utc).isoformat()})
