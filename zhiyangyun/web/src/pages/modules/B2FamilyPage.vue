@@ -2,17 +2,30 @@
   <el-row :gutter="16">
     <el-col :span="8">
       <el-card>
-        <template #header>家属账号</template>
-        <el-form>
-          <el-select v-model="form.elder_id" placeholder="选择长者" style="width:100%;margin-bottom:8px">
-            <el-option v-for="e in elders" :key="e.id" :label="e.name" :value="e.id" />
-          </el-select>
-          <el-input v-model="form.name" placeholder="姓名" style="margin-bottom:8px"/>
-          <el-input v-model="form.phone" placeholder="电话" style="margin-bottom:8px"/>
-          <el-input v-model="form.relation" placeholder="关系" style="margin-bottom:8px"/>
+        <template #header>
+          <div>
+            <div>家属账号</div>
+            <div style="font-size:12px;color:#909399">先绑定长者，再填写家属信息。</div>
+          </div>
+        </template>
+        <el-form label-width="90px">
+          <el-form-item label="关联长者">
+            <el-select v-model="form.elder_id" placeholder="请选择长者" style="width:100%">
+              <el-option v-for="e in elders" :key="e.id" :label="e.name" :value="e.id" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="家属姓名"><el-input v-model="form.name" placeholder="例如：王小明" /></el-form-item>
+          <el-form-item label="手机号"><el-input v-model="form.phone" placeholder="11位手机号" /></el-form-item>
+          <el-form-item label="关系">
+            <el-select v-model="form.relation" placeholder="请选择关系" style="width:100%">
+              <el-option label="子女" value="子女" />
+              <el-option label="配偶" value="配偶" />
+              <el-option label="其他" value="其他" />
+            </el-select>
+          </el-form-item>
           <el-button type="primary" @click="createFamily">新增家属</el-button>
         </el-form>
-        <el-table :data="families" style="margin-top:10px" @row-click="pickElderByFamily">
+        <el-table :data="families" style="margin-top:10px" @row-click="pickElderByFamily" border>
           <el-table-column prop="name" label="家属"/>
           <el-table-column prop="relation" label="关系"/>
           <el-table-column prop="elder_id" label="长者ID"/>
@@ -22,9 +35,14 @@
 
     <el-col :span="16">
       <el-card>
-        <template #header>家属可见账单/护理记录/问卷评价</template>
+        <template #header>
+          <div>
+            <div>家属可见账单/护理记录/问卷评价</div>
+            <div style="font-size:12px;color:#909399">请先在下方选择一个长者。</div>
+          </div>
+        </template>
         <div style="margin-bottom:10px">
-          <el-select v-model="selectedElderId" placeholder="选择长者" style="width:240px" @change="loadElderPortalData">
+          <el-select v-model="selectedElderId" placeholder="选择长者" style="width:260px" @change="loadElderPortalData">
             <el-option v-for="e in elders" :key="e.id" :label="e.name" :value="e.id" />
           </el-select>
         </div>
@@ -46,11 +64,9 @@
           </el-tab-pane>
           <el-tab-pane label="问卷评价">
             <el-form inline>
-              <el-form-item label="评分">
-                <el-rate v-model="survey.score" />
-              </el-form-item>
+              <el-form-item label="评分"><el-rate v-model="survey.score" /></el-form-item>
               <el-form-item>
-                <el-input v-model="survey.comment" placeholder="评价内容" style="width:260px"/>
+                <el-input v-model="survey.comment" placeholder="请填写本次服务评价" style="width:320px"/>
               </el-form-item>
               <el-button type="primary" @click="submitSurvey">提交</el-button>
             </el-form>
@@ -94,6 +110,7 @@ const loadElderPortalData = async () => {
 }
 
 const createFamily = async () => {
+  if (!form.elder_id || !form.name || !form.phone || !form.relation) return ElMessage.error('请完整填写家属信息')
   await http.post('/b2-family/accounts', form)
   form.name = ''
   form.phone = ''

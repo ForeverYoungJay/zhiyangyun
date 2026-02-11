@@ -1,4 +1,5 @@
 <template>
+  <el-alert type="info" :closable="false" show-icon title="操作顺序：先建服务项目→建套餐→绑定套餐项目→给长者订阅套餐→生成任务→扫码开始/完成→监督评分。" style="margin-bottom:12px" />
   <el-row :gutter="16">
     <el-col :span="8">
       <el-card>

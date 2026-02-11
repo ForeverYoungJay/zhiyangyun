@@ -1,7 +1,12 @@
 <template>
   <div style="height:100vh;display:flex;justify-content:center;align-items:center">
     <el-card style="width:360px">
-      <template #header>登录</template>
+      <template #header>
+        <div>
+          <div>登录</div>
+          <div style="font-size:12px;color:#909399">请输入管理员账号；默认测试账号见 README。</div>
+        </div>
+      </template>
       <el-form :model="form" @submit.prevent>
         <el-form-item label="用户名"><el-input v-model="form.username" /></el-form-item>
         <el-form-item label="密码"><el-input v-model="form.password" show-password type="password" /></el-form-item>

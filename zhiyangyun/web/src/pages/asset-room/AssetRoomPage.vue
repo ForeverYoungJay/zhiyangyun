@@ -1,4 +1,5 @@
 <template>
+  <el-alert type="info" :closable="false" show-icon title="操作顺序建议：先创建楼栋→楼层→房间→床位，再切换床位状态。二维码值会自动生成。" style="margin-bottom:12px" />
   <el-row :gutter="16">
     <el-col :span="12">
       <el-card>

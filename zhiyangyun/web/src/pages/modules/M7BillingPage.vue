@@ -14,11 +14,16 @@
     </el-col>
     <el-col :span="12">
       <el-card>
-        <template #header>月度发票</template>
+        <template #header>
+          <div>
+            <div>月度发票</div>
+            <div style="font-size:12px;color:#909399">录入长者月账单汇总（可由自动扣费后补录确认）。</div>
+          </div>
+        </template>
         <el-form inline>
-          <el-form-item><el-input v-model="invoice.elder_id" placeholder="elder_id"/></el-form-item>
-          <el-form-item><el-input v-model="invoice.period_month" placeholder="YYYY-MM"/></el-form-item>
-          <el-form-item><el-input-number v-model="invoice.total_amount" :min="0"/></el-form-item>
+          <el-form-item label="长者ID"><el-input v-model="invoice.elder_id" placeholder="请输入长者ID"/></el-form-item>
+          <el-form-item label="账期"><el-input v-model="invoice.period_month" placeholder="YYYY-MM"/></el-form-item>
+          <el-form-item label="总额"><el-input-number v-model="invoice.total_amount" :min="0"/></el-form-item>
           <el-button type="primary" @click="createInvoice">新增</el-button>
         </el-form>
         <el-table :data="invoices" border style="margin-top:10px">

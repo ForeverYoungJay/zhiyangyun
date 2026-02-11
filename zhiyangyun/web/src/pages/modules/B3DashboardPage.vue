@@ -16,12 +16,17 @@
     </el-col>
     <el-col :span="14">
       <el-card>
-        <template #header>看板手工补录（历史）</template>
+        <template #header>
+          <div>
+            <div>看板手工补录（历史）</div>
+            <div style="font-size:12px;color:#909399">用于补录历史指标：日期、占用率、营收、告警数。</div>
+          </div>
+        </template>
         <el-form inline>
-          <el-form-item><el-input v-model="form.metric_date" placeholder="YYYY-MM-DD"/></el-form-item>
-          <el-form-item><el-input-number v-model="form.occupancy_rate" :min="0" :max="100"/></el-form-item>
-          <el-form-item><el-input-number v-model="form.revenue" :min="0"/></el-form-item>
-          <el-form-item><el-input-number v-model="form.alerts" :min="0"/></el-form-item>
+          <el-form-item label="日期"><el-input v-model="form.metric_date" placeholder="YYYY-MM-DD"/></el-form-item>
+          <el-form-item label="占用率(%)"><el-input-number v-model="form.occupancy_rate" :min="0" :max="100"/></el-form-item>
+          <el-form-item label="营收"><el-input-number v-model="form.revenue" :min="0"/></el-form-item>
+          <el-form-item label="告警数"><el-input-number v-model="form.alerts" :min="0"/></el-form-item>
           <el-button type="primary" @click="createMetric">新增</el-button>
         </el-form>
         <el-table :data="metrics" border style="margin-top:10px">

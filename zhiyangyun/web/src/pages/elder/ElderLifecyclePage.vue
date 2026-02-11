@@ -1,4 +1,5 @@
 <template>
+  <el-alert type="info" :closable="false" show-icon title="流程：先录入CRM线索，再建档；入院/转床需先在资产模块准备可用床位。长者编号可留空自动生成。" style="margin-bottom:12px" />
   <el-row :gutter="16">
     <el-col :span="12">
       <el-card>
