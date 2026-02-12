@@ -15,6 +15,17 @@ from app.models.care import (
 from app.models.medical import MedicationOrder, MedicationExecution, MealPlan, MealOrder, VitalSignRecord, HealthAssessment, BillingItem, BillingInvoice
 from app.models.oa import ShiftTemplate, ShiftAssignment, ApprovalRequest, NotificationMessage, TrainingCourse, TrainingRecord
 from app.models.business import MiniappServiceRequest, FamilyAccount, FamilyVisit, DashboardMetric, FamilyCareRecord, FamilySurvey
+from app.models.commerce import (
+    ProductCategory,
+    ProductSPU,
+    ProductSKU,
+    InventoryLedger,
+    InventoryReservation,
+    AccountBalance,
+    AccountLedger,
+    ShopOrder,
+    ShopOrderItem,
+)
 
 __all__ = [
     "User",
@@ -57,4 +68,13 @@ __all__ = [
     "DashboardMetric",
     "FamilyCareRecord",
     "FamilySurvey",
+    "ProductCategory",
+    "ProductSPU",
+    "ProductSKU",
+    "InventoryLedger",
+    "InventoryReservation",
+    "AccountBalance",
+    "AccountLedger",
+    "ShopOrder",
+    "ShopOrderItem",
 ]

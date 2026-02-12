@@ -128,7 +128,8 @@ class Client:
         self._check("m5.plan_pagination_ready", isinstance(m5_paged_plan, dict) and "items" in m5_paged_plan and "total" in m5_paged_plan, f"plan={m5_paged_plan}")
         self._call("POST", "/m5-meal/orders", {"elder_id": elder["id"], "plan_id": plan["id"]})
         m5_orders = self._call("GET", "/m5-meal/orders?page=1&page_size=5") or {}
-        first_order = (m5_orders.get("items") or [{}])[0]
+        m5_order_items = m5_orders.get("items", []) if isinstance(m5_orders, dict) else (m5_orders or [])
+        first_order = (m5_order_items or [{}])[0]
         self._check("m5.order_name_present", bool(first_order.get("elder_name") and first_order.get("plan_name")), f"orders={m5_orders}")
         m7_items_after_m5 = self._call("GET", "/m7-billing/items") or []
         self._check("m5.order_auto_billing", any((x.get("item_name") or "").startswith("膳食供应") for x in m7_items_after_m5), f"items={m7_items_after_m5}")
@@ -177,6 +178,42 @@ class Client:
         self._call("POST", "/b2-family/surveys", {"elder_id": elder["id"], "family_id": family["id"], "score": 5, "comment": "满意"})
         surveys = self._call("GET", f"/b2-family/surveys?elder_id={elder['id']}") or []
         self._check("linkage.family_survey_recorded", len(surveys) > 0, f"surveys={surveys}")
+
+        cat = self._call("POST", "/shop/categories", {"name_zh": "护理用品", "code": f"CAT{datetime.now().strftime('%H%M%S')}"})
+        spu = self._call("POST", "/shop/spu", {"category_id": cat["id"], "name_zh": "护理湿巾", "subtitle_zh": "加厚款", "description_zh": "无酒精"}) if cat else None
+        if spu:
+            self._call("PATCH", f"/shop/spu/{spu['id']}/status", {"status": "on_shelf"})
+        sku = self._call("POST", "/shop/sku", {"spu_id": spu["id"], "sku_name_zh": "护理湿巾-80抽", "sku_code": f"SKU{datetime.now().strftime('%H%M%S')}", "sale_price": 19.9, "warning_stock": 3, "available_stock": 8}) if spu else None
+        if sku:
+            self._call("POST", "/shop/inventory/in", {"sku_id": sku["id"], "quantity": 2, "remark": "回归补货"})
+            self._call("POST", "/shop/inventory/out", {"sku_id": sku["id"], "quantity": 1, "remark": "回归出库"})
+            self._call("POST", "/shop/inventory/check", {"sku_id": sku["id"], "actual_stock": 6, "remark": "回归盘点"})
+        inv_ledger = self._call("GET", "/shop/inventory/ledger?page=1&page_size=10") or {}
+        inv_warn = self._call("GET", "/shop/inventory/warnings") or []
+        self._check("shop.inventory_ledger_ready", isinstance(inv_ledger, dict) and len(inv_ledger.get("items", [])) > 0, f"ledger={inv_ledger}")
+        self._check("shop.inventory_warning_ready", isinstance(inv_warn, list), f"warn={inv_warn}")
+        sku_suggest = self._call("GET", "/shop/sku/suggest?keyword=湿巾") or []
+        self._check("shop.sku_autocomplete_ready", len(sku_suggest) > 0, f"suggest={sku_suggest}")
+
+        order_created = self._call("POST", "/shop/orders", {"elder_id": elder["id"], "items": [{"sku_id": sku["id"], "quantity": 2}]}) if sku else None
+        self._check("shop.order_created", bool(order_created and order_created.get("id")), f"order={order_created}")
+        if order_created:
+            self._call("POST", f"/shop/orders/{order_created['id']}/pay")
+            self._call("POST", f"/shop/orders/{order_created['id']}/complete")
+            self._call("POST", f"/shop/orders/{order_created['id']}/refund", {"reason": "回归退款"})
+        order_cancel = self._call("POST", "/shop/orders", {"elder_id": elder["id"], "items": [{"sku_id": sku["id"], "quantity": 1}]}) if sku else None
+        if order_cancel:
+            self._call("POST", f"/shop/orders/{order_cancel['id']}/cancel", {"reason": "回归取消"})
+
+        shop_orders = self._call("GET", "/shop/orders?page=1&page_size=10&keyword=回归") or {}
+        self._check("shop.order_pagination_name_ready", isinstance(shop_orders, dict) and bool((shop_orders.get("items") or [{}])[0].get("elder_name")), f"orders={shop_orders}")
+        account_ledger = self._call("GET", f"/shop/elders/{elder['id']}/account-ledger") or []
+        self._check("shop.account_ledger_ready", len(account_ledger) > 0, f"ledger={account_ledger}")
+
+        family_orders = self._call("GET", f"/b2-family/elders/{elder['id']}/orders") or []
+        family_balance = self._call("GET", f"/b2-family/elders/{elder['id']}/balance-changes") or []
+        self._check("family.shop_orders_visible", len(family_orders) > 0, f"orders={family_orders}")
+        self._check("family.balance_changes_visible", len(family_balance) > 0, f"balance={family_balance}")
 
         self._call("POST", "/b3-dashboard/metrics", {"metric_date": str(date.today()), "occupancy_rate": 86.5, "revenue": 1000, "alerts": 2})
         self._call("GET", "/b3-dashboard/metrics")

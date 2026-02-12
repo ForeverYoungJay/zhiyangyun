@@ -15,6 +15,7 @@ import OA4TrainingPage from '../pages/modules/OA4TrainingPage.vue'
 import B1MiniappPage from '../pages/modules/B1MiniappPage.vue'
 import B2FamilyPage from '../pages/modules/B2FamilyPage.vue'
 import B3DashboardPage from '../pages/modules/B3DashboardPage.vue'
+import ShopInventoryPage from '../pages/modules/ShopInventoryPage.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -37,7 +38,8 @@ const router = createRouter({
         { path: 'oa4', component: OA4TrainingPage },
         { path: 'b1', component: B1MiniappPage },
         { path: 'b2', component: B2FamilyPage },
-        { path: 'b3', component: B3DashboardPage }
+        { path: 'b3', component: B3DashboardPage },
+        { path: 'shop', component: ShopInventoryPage }
       ]
     }
   ]

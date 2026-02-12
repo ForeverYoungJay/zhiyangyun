@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, asset, elder, care, m4_medication, m5_meal, m6_health, m7_billing, oa1_shift, oa2_approval, oa3_notification, oa4_training, b1_miniapp, b2_family, b3_dashboard
+from app.api.routes import auth, asset, elder, care, m4_medication, m5_meal, m6_health, m7_billing, oa1_shift, oa2_approval, oa3_notification, oa4_training, b1_miniapp, b2_family, b3_dashboard, commerce
 from app.core.config import settings
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
@@ -29,6 +29,7 @@ app.include_router(oa4_training.router, prefix=settings.api_prefix)
 app.include_router(b1_miniapp.router, prefix=settings.api_prefix)
 app.include_router(b2_family.router, prefix=settings.api_prefix)
 app.include_router(b3_dashboard.router, prefix=settings.api_prefix)
+app.include_router(commerce.router, prefix=settings.api_prefix)
 
 
 @app.get("/health")

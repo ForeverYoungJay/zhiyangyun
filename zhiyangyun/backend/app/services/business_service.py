@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.models.asset import Bed
 from app.models.business import MiniappServiceRequest, FamilyAccount, FamilyVisit, DashboardMetric, FamilyCareRecord, FamilySurvey
 from app.models.care import CareTask, CarePackage, ElderPackage, ServiceItem
+from app.models.commerce import AccountLedger, ShopOrder
 from app.models.elder import Elder
 from app.models.medical import BillingItem, VitalSignRecord
 from app.schemas.business import MiniappServiceRequestCreate, FamilyAccountCreate, FamilyVisitCreate, DashboardMetricCreate, FamilySurveyCreate, FamilyServiceOrderCreate
@@ -47,6 +48,12 @@ class BusinessService:
 
     def list_family_care_records(self, db: Session, tenant_id: str, elder_id: str):
         return db.scalars(select(FamilyCareRecord).where(FamilyCareRecord.tenant_id == tenant_id, FamilyCareRecord.elder_id == elder_id).order_by(FamilyCareRecord.occurred_at.desc())).all()
+
+    def list_family_orders(self, db: Session, tenant_id: str, elder_id: str):
+        return db.scalars(select(ShopOrder).where(ShopOrder.tenant_id == tenant_id, ShopOrder.elder_id == elder_id).order_by(ShopOrder.created_at.desc())).all()
+
+    def list_family_balance_changes(self, db: Session, tenant_id: str, elder_id: str):
+        return db.scalars(select(AccountLedger).where(AccountLedger.tenant_id == tenant_id, AccountLedger.elder_id == elder_id).order_by(AccountLedger.created_at.desc())).all()
 
     def list_surveys(self, db: Session, tenant_id: str, elder_id: str | None = None):
         stmt = select(FamilySurvey).where(FamilySurvey.tenant_id == tenant_id)

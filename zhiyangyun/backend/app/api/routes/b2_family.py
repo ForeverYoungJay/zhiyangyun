@@ -41,6 +41,16 @@ def elder_care_records(elder_id: str, db: Session = Depends(get_db), current: Cu
     return ApiResponse(data=service.list_family_care_records(db, current.tenant_id, elder_id))
 
 
+@router.get("/elders/{elder_id}/orders", response_model=ApiResponse)
+def elder_orders(elder_id: str, db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
+    return ApiResponse(data=service.list_family_orders(db, current.tenant_id, elder_id))
+
+
+@router.get("/elders/{elder_id}/balance-changes", response_model=ApiResponse)
+def elder_balance_changes(elder_id: str, db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
+    return ApiResponse(data=service.list_family_balance_changes(db, current.tenant_id, elder_id))
+
+
 @router.get("/elders/{elder_id}/overview", response_model=ApiResponse)
 def elder_overview(elder_id: str, db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
     data = service.get_family_elder_overview(db, current.tenant_id, elder_id)

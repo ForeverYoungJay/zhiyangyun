@@ -88,6 +88,41 @@ docker compose run --rm seed
 - `docs/08-测试与验收手册.md`
 - `docs/09-变更日志.md`
 
+## 商城+库存（本次优先补齐）
+### 能力清单
+1. **商品/SPU-SKU 管理**
+   - 分类：`GET/POST /api/v1/shop/categories`
+   - SPU：`GET/POST /api/v1/shop/spu`，上下架：`PATCH /api/v1/shop/spu/{id}/status`
+   - SKU：`GET/POST /api/v1/shop/sku`，支持中文字段、分类/名称展示
+2. **库存台账**
+   - 入库：`POST /api/v1/shop/inventory/in`
+   - 出库：`POST /api/v1/shop/inventory/out`
+   - 盘点：`POST /api/v1/shop/inventory/check`
+   - 台账：`GET /api/v1/shop/inventory/ledger`
+   - 预警：`GET /api/v1/shop/inventory/warnings`
+3. **订单流程**
+   - 下单：`POST /api/v1/shop/orders`
+   - 支付：`POST /api/v1/shop/orders/{id}/pay`
+   - 取消：`POST /api/v1/shop/orders/{id}/cancel`
+   - 退款：`POST /api/v1/shop/orders/{id}/refund`
+   - 完成：`POST /api/v1/shop/orders/{id}/complete`
+4. **余额账单联动**
+   - 订单支付自动记账（扣费流水）
+   - 订单退款自动记账（退款流水）
+   - 查询：`GET /api/v1/shop/elders/{elder_id}/account-ledger`
+5. **库存预占/防超卖/失败回滚**
+   - 下单时先预占库存（`reserve` 台账 + reservation）
+   - 库存不足会拒绝下单（防超卖）
+   - 取消订单自动释放预占
+6. **家属端可见**
+   - 家属可查订单：`GET /api/v1/b2-family/elders/{elder_id}/orders`
+   - 家属可查余额变动：`GET /api/v1/b2-family/elders/{elder_id}/balance-changes`
+7. **前端体验**
+   - 新增 `A1-M8 商城+库存` 页面（`/shop`）
+   - 列表分页/搜索
+   - SKU 自动联想
+   - 列表展示中文名与长者姓名（替代纯 ID）
+
 ## 自动化 API 回归
 脚本位置：`scripts/api_regression.py`
 
@@ -186,6 +221,11 @@ curl -s -X POST http://localhost:8000/api/v1/auth/login \
 - `2026021115_linkage_enhance.py`
   - `family_care_records`
   - `family_surveys`
+- `2026021117_shop_inventory.py`
+  - 商城分类/SPU/SKU
+  - 库存台账与预占
+  - 订单主子表
+  - 余额与流水账本
 
 如本地已启动旧库，请先执行：
 ```bash
