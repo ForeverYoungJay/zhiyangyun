@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -11,7 +13,10 @@ class AssetService:
         return db.scalars(select(Building).where(Building.tenant_id == tenant_id)).all()
 
     def create_building(self, db: Session, tenant_id: str, payload: BuildingCreate):
-        item = Building(tenant_id=tenant_id, name=payload.name, code=payload.code)
+        code = payload.code
+        if not code:
+            code = f"B{datetime.now().strftime('%H%M%S%f')[-8:]}"
+        item = Building(tenant_id=tenant_id, name=payload.name, code=code)
         db.add(item)
         db.commit()
         db.refresh(item)
@@ -21,7 +26,8 @@ class AssetService:
         return db.scalars(select(Floor).where(Floor.tenant_id == tenant_id)).all()
 
     def create_floor(self, db: Session, tenant_id: str, payload: FloorCreate):
-        item = Floor(tenant_id=tenant_id, building_id=payload.building_id, floor_no=payload.floor_no, name=payload.name)
+        floor_name = payload.name or f"{payload.floor_no}层"
+        item = Floor(tenant_id=tenant_id, building_id=payload.building_id, floor_no=payload.floor_no, name=floor_name)
         db.add(item)
         db.commit()
         db.refresh(item)

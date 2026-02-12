@@ -26,57 +26,93 @@
       :title="`检测到 ${summary.anomaly_count} 条床位与长者状态不一致，建议执行“一致性修复”`"
       style="margin-bottom:12px"
     />
-    <el-alert type="info" :closable="false" show-icon title="操作顺序建议：先创建楼栋→楼层→房间→床位，再通过 M2 入院/转床流程占用床位。" style="margin-bottom:12px" />
+    <el-alert type="info" :closable="false" show-icon title="操作顺序：先创建楼栋→楼层→房间→床位；床位占用请走 M2 入院/转床。楼层名称可留空自动生成为“X层”。" style="margin-bottom:12px" />
 
     <el-row :gutter="16">
       <el-col :span="12">
         <el-card>
-          <template #header>楼栋</template>
+          <template #header>楼栋（不需要手填编码）</template>
           <el-form inline>
-            <el-form-item><el-input v-model="building.name" placeholder="楼栋名" /></el-form-item>
-            <el-form-item><el-input v-model="building.code" placeholder="编码" /></el-form-item>
+            <el-form-item><el-input v-model="building.name" placeholder="楼栋名称（可重复）" /></el-form-item>
             <el-form-item><el-button type="primary" @click="createBuilding">新增</el-button></el-form-item>
           </el-form>
-          <el-table :data="buildings"><el-table-column prop="name" label="名称"/><el-table-column prop="code" label="编码"/></el-table>
+          <el-table :data="buildings">
+            <el-table-column prop="name" label="名称"/>
+            <el-table-column prop="code" label="系统编码"/>
+          </el-table>
         </el-card>
+
         <el-card style="margin-top:16px">
-          <template #header>楼层</template>
+          <template #header>楼层（按楼栋过滤）</template>
           <el-form inline>
-            <el-form-item><el-select v-model="floor.building_id" placeholder="楼栋" style="width:120px"><el-option v-for="b in buildings" :key="b.id" :value="b.id" :label="b.name" /></el-select></el-form-item>
+            <el-form-item>
+              <el-select v-model="floor.building_id" placeholder="选择楼栋" style="width:140px">
+                <el-option v-for="b in buildings" :key="b.id" :value="b.id" :label="b.name" />
+              </el-select>
+            </el-form-item>
             <el-form-item><el-input-number v-model="floor.floor_no" :min="1" /></el-form-item>
-            <el-form-item><el-input v-model="floor.name" placeholder="楼层名" /></el-form-item>
+            <el-form-item><el-input v-model="floor.name" placeholder="楼层名（可留空自动生成）" /></el-form-item>
             <el-form-item><el-button type="primary" @click="createFloor">新增</el-button></el-form-item>
           </el-form>
-          <el-table :data="floors"><el-table-column prop="name" label="楼层"/><el-table-column prop="floor_no" label="层号"/></el-table>
+          <el-table :data="filteredFloorsForBuilding">
+            <el-table-column prop="name" label="楼层"/>
+            <el-table-column prop="floor_no" label="层号"/>
+          </el-table>
         </el-card>
       </el-col>
 
       <el-col :span="12">
         <el-card>
-          <template #header>房间</template>
+          <template #header>房间（只显示已选楼栋/楼层）</template>
           <el-form inline>
-            <el-form-item><el-select v-model="room.building_id" placeholder="楼栋" style="width:120px"><el-option v-for="b in buildings" :key="b.id" :value="b.id" :label="b.name" /></el-select></el-form-item>
-            <el-form-item><el-select v-model="room.floor_id" placeholder="楼层" style="width:120px"><el-option v-for="f in floors" :key="f.id" :value="f.id" :label="f.name" /></el-select></el-form-item>
+            <el-form-item>
+              <el-select v-model="room.building_id" placeholder="楼栋" style="width:120px">
+                <el-option v-for="b in buildings" :key="b.id" :value="b.id" :label="b.name" />
+              </el-select>
+            </el-form-item>
+            <el-form-item>
+              <el-select v-model="room.floor_id" placeholder="楼层" style="width:120px">
+                <el-option v-for="f in roomFloorOptions" :key="f.id" :value="f.id" :label="f.name" />
+              </el-select>
+            </el-form-item>
             <el-form-item><el-input v-model="room.room_no" placeholder="房间号" /></el-form-item>
-            <el-form-item><el-select v-model="room.room_type" style="width:120px"><el-option label="single" value="single"/><el-option label="double" value="double"/></el-select></el-form-item>
+            <el-form-item>
+              <el-select v-model="room.room_type" style="width:120px">
+                <el-option label="单人间" value="single"/>
+                <el-option label="双人间" value="double"/>
+                <el-option label="多人间" value="multi"/>
+              </el-select>
+            </el-form-item>
             <el-form-item><el-button type="primary" @click="createRoom">新增</el-button></el-form-item>
           </el-form>
-          <el-table :data="rooms"><el-table-column prop="room_no" label="房间号"/><el-table-column prop="room_type" label="类型"/></el-table>
+          <el-table :data="filteredRoomsForRoomForm">
+            <el-table-column prop="room_no" label="房间号"/>
+            <el-table-column label="类型">
+              <template #default="scope">{{ roomTypeLabel(scope.row.room_type) }}</template>
+            </el-table-column>
+          </el-table>
         </el-card>
 
         <el-card style="margin-top:16px">
           <template #header>床位 + 二维码文本</template>
           <el-form inline>
-            <el-form-item><el-select v-model="bed.room_id" placeholder="房间" style="width:120px"><el-option v-for="r in rooms" :key="r.id" :value="r.id" :label="r.room_no" /></el-select></el-form-item>
+            <el-form-item>
+              <el-select v-model="bed.room_id" placeholder="房间" style="width:140px">
+                <el-option v-for="r in filteredRoomsForRoomForm" :key="r.id" :value="r.id" :label="`${r.room_no}（${roomTypeLabel(r.room_type)}）`" />
+              </el-select>
+            </el-form-item>
             <el-form-item><el-input v-model="bed.bed_no" placeholder="床号" /></el-form-item>
             <el-form-item><el-button type="primary" @click="createBed">新增</el-button></el-form-item>
           </el-form>
-          <el-table :data="beds">
+          <el-table :data="filteredBedsByRoomSelection">
             <el-table-column prop="bed_no" label="床号"/>
-            <el-table-column prop="status" label="状态" width="160">
+            <el-table-column prop="status" label="状态" width="180">
               <template #default="scope">
-                <el-select :model-value="scope.row.status" @change="(v:string)=>updateStatus(scope.row.id,v)" style="width:130px">
-                  <el-option label="vacant" value="vacant"/><el-option label="reserved" value="reserved"/><el-option label="occupied" value="occupied"/><el-option label="maintenance" value="maintenance"/>
+                <el-select :model-value="scope.row.status" @change="(v:string)=>updateStatus(scope.row.id,v)" style="width:150px">
+                  <el-option label="空闲" value="vacant"/>
+                  <el-option label="预留" value="reserved"/>
+                  <el-option label="已占用" value="occupied"/>
+                  <el-option label="维修中" value="maintenance"/>
                 </el-select>
               </template>
             </el-table-column>
@@ -84,6 +120,9 @@
               <template #default="scope">
                 <el-tag :type="bedConsistent(scope.row.id) ? 'success' : 'danger'">{{ bedConsistent(scope.row.id) ? '正常' : '异常' }}</el-tag>
               </template>
+            </el-table-column>
+            <el-table-column label="状态(中文)">
+              <template #default="scope">{{ bedStatusLabel(scope.row.status) }}</template>
             </el-table-column>
             <el-table-column prop="qr_code" label="二维码值"/>
           </el-table>
@@ -94,7 +133,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '../../api/http'
 
@@ -105,10 +144,44 @@ const beds = ref<any[]>([])
 
 const summary = ref<any>({ total_beds: 0, occupied_beds: 0, vacant_beds: 0, occupancy_rate: 0, anomaly_count: 0, anomalies: [] })
 
-const building = reactive({ name: '', code: '' })
+const building = reactive({ name: '' })
 const floor = reactive({ building_id: '', floor_no: 1, name: '' })
 const room = reactive({ building_id: '', floor_id: '', room_no: '', room_type: 'double' })
 const bed = reactive({ room_id: '', bed_no: '' })
+
+const roomTypeLabel = (v: string) => ({ single: '单人间', double: '双人间', multi: '多人间' } as any)[v] || v
+const bedStatusLabel = (v: string) => ({ vacant: '空闲', reserved: '预留', occupied: '已占用', maintenance: '维修中' } as any)[v] || v
+
+const filteredFloorsForBuilding = computed(() => {
+  if (!floor.building_id) return floors.value
+  return floors.value.filter((x) => x.building_id === floor.building_id)
+})
+
+const roomFloorOptions = computed(() => {
+  if (!room.building_id) return floors.value
+  return floors.value.filter((x) => x.building_id === room.building_id)
+})
+
+const filteredRoomsForRoomForm = computed(() => {
+  return rooms.value.filter((r) => {
+    if (room.building_id && r.building_id !== room.building_id) return false
+    if (room.floor_id && r.floor_id !== room.floor_id) return false
+    return true
+  })
+})
+
+const filteredBedsByRoomSelection = computed(() => {
+  if (!bed.room_id) return beds.value
+  return beds.value.filter((b) => b.room_id === bed.room_id)
+})
+
+watch(() => room.building_id, () => {
+  room.floor_id = ''
+  bed.room_id = ''
+})
+watch(() => room.floor_id, () => {
+  bed.room_id = ''
+})
 
 const refresh = async () => {
   buildings.value = (await http.get('/assets/buildings')).data.data
@@ -118,10 +191,30 @@ const refresh = async () => {
   summary.value = (await http.get('/assets/occupancy-summary')).data.data
 }
 
-const createBuilding = async () => { await http.post('/assets/buildings', building); building.name='';building.code=''; await refresh() }
-const createFloor = async () => { await http.post('/assets/floors', floor); floor.name=''; await refresh() }
-const createRoom = async () => { await http.post('/assets/rooms', room); room.room_no=''; await refresh() }
-const createBed = async () => { await http.post('/assets/beds', bed); bed.bed_no=''; await refresh() }
+const createBuilding = async () => {
+  if (!building.name) return ElMessage.error('请填写楼栋名称')
+  await http.post('/assets/buildings', { name: building.name })
+  building.name = ''
+  await refresh()
+}
+const createFloor = async () => {
+  if (!floor.building_id) return ElMessage.error('请先选择楼栋')
+  await http.post('/assets/floors', floor)
+  floor.name = ''
+  await refresh()
+}
+const createRoom = async () => {
+  if (!room.building_id || !room.floor_id) return ElMessage.error('请先选择楼栋和楼层')
+  await http.post('/assets/rooms', room)
+  room.room_no = ''
+  await refresh()
+}
+const createBed = async () => {
+  if (!bed.room_id) return ElMessage.error('请先选择房间')
+  await http.post('/assets/beds', bed)
+  bed.bed_no = ''
+  await refresh()
+}
 const updateStatus = async (id: string, status: string) => {
   try {
     await http.patch(`/assets/beds/${id}/status`, { status })

@@ -3,13 +3,13 @@ from pydantic import BaseModel
 
 class BuildingCreate(BaseModel):
     name: str
-    code: str
+    code: str | None = None
 
 
 class FloorCreate(BaseModel):
     building_id: str
     floor_no: int
-    name: str
+    name: str | None = None
 
 
 class RoomCreate(BaseModel):
