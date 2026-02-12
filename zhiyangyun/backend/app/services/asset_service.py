@@ -13,6 +13,8 @@ class AssetService:
         return db.scalars(select(Building).where(Building.tenant_id == tenant_id)).all()
 
     def create_building(self, db: Session, tenant_id: str, payload: BuildingCreate):
+        if db.scalar(select(Building).where(Building.tenant_id == tenant_id, Building.name == payload.name)):
+            raise ValueError("同名楼栋已存在，请使用不同名称")
         code = payload.code
         if not code:
             code = f"B{datetime.now().strftime('%H%M%S%f')[-8:]}"

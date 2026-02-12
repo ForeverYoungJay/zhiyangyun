@@ -19,8 +19,11 @@ def list_buildings(db: Session = Depends(get_db), current: CurrentUser = Depends
 
 @router.post("/buildings", response_model=ApiResponse)
 def create_building(payload: BuildingCreate, db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
-    data = service.create_building(db, current.tenant_id, payload)
-    return ApiResponse(message="created", data=data)
+    try:
+        data = service.create_building(db, current.tenant_id, payload)
+        return ApiResponse(message="created", data=data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/floors", response_model=ApiResponse)
