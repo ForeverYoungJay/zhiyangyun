@@ -16,6 +16,11 @@
   - 新增：
     - `GET /care/governance-summary`
 - M4 用药：`/m4-medication/*`
+  - 新增：
+    - `GET /m4-medication/elders/suggest?keyword=...&limit=...`
+    - `GET /m4-medication/orders?page=...&page_size=...&keyword=...&status=...`
+  - 联动：
+    - `POST /m4-medication/executions` 成功后自动写入 M7 `billing_items` 并累计当月 `billing_invoices.total_amount`
 - M5 膳食：`/m5-meal/*`
 - M6 健康：`/m6-health/*`
 - M7 财务：`/m7-billing/*`

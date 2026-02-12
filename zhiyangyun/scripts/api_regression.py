@@ -110,9 +110,16 @@ class Client:
         self._call("POST", "/care/tasks/dispatch", {"elder_package_id": elder_pkg["id"], "dispatch_type": "periodic", "frequency": "custom", "custom_times": 2, "start_at": datetime.now(timezone.utc).isoformat()})
 
         order = self._call("POST", "/m4-medication/orders", {"elder_id": elder["id"], "drug_name": "阿司匹林", "dosage": "100mg", "frequency": "qd", "start_date": str(date.today())})
+        suggest = self._call("GET", f"/m4-medication/elders/suggest?keyword={elder['name']}") or []
+        self._check("m4.elder_autocomplete_ready", len(suggest) > 0, f"suggest={suggest}")
+        paged_orders = self._call("GET", "/m4-medication/orders?page=1&page_size=5&keyword=阿司") or {}
+        self._check("m4.order_pagination_ready", isinstance(paged_orders, dict) and "items" in paged_orders and "total" in paged_orders, f"paged={paged_orders}")
+        self._check("m4.order_name_present", bool((paged_orders.get("items") or [{}])[0].get("elder_name")), f"paged={paged_orders}")
         self._call("POST", "/m4-medication/executions", {"order_id": order["id"], "result": "done", "note": "按时执行"})
-        self._call("GET", "/m4-medication/orders")
-        self._call("GET", "/m4-medication/executions")
+        m4_execs = self._call("GET", "/m4-medication/executions") or []
+        self._check("m4.execution_name_present", bool(m4_execs and m4_execs[0].get("elder_name")), f"execs={m4_execs}")
+        m7_items = self._call("GET", "/m7-billing/items") or []
+        self._check("m4.execution_auto_billing", any((x.get("item_name") or "").startswith("用药执行") for x in m7_items), f"items={m7_items}")
 
         plan = self._call("POST", "/m5-meal/plans", {"name": "高蛋白菜谱", "plan_date": str(date.today()), "meal_type": "lunch", "nutrition_tag": "high_protein", "note": "少盐"})
         self._call("POST", "/m5-meal/orders", {"elder_id": elder["id"], "plan_id": plan["id"]})
