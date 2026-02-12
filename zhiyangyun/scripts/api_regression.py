@@ -122,9 +122,16 @@ class Client:
         self._check("m4.execution_auto_billing", any((x.get("item_name") or "").startswith("用药执行") for x in m7_items), f"items={m7_items}")
 
         plan = self._call("POST", "/m5-meal/plans", {"name": "高蛋白菜谱", "plan_date": str(date.today()), "meal_type": "lunch", "nutrition_tag": "high_protein", "note": "少盐"})
+        m5_suggest = self._call("GET", f"/m5-meal/elders/suggest?keyword={elder['name']}") or []
+        self._check("m5.elder_autocomplete_ready", len(m5_suggest) > 0, f"suggest={m5_suggest}")
+        m5_paged_plan = self._call("GET", "/m5-meal/plans?page=1&page_size=5&keyword=高蛋白") or {}
+        self._check("m5.plan_pagination_ready", isinstance(m5_paged_plan, dict) and "items" in m5_paged_plan and "total" in m5_paged_plan, f"plan={m5_paged_plan}")
         self._call("POST", "/m5-meal/orders", {"elder_id": elder["id"], "plan_id": plan["id"]})
-        self._call("GET", "/m5-meal/plans")
-        self._call("GET", "/m5-meal/orders")
+        m5_orders = self._call("GET", "/m5-meal/orders?page=1&page_size=5") or {}
+        first_order = (m5_orders.get("items") or [{}])[0]
+        self._check("m5.order_name_present", bool(first_order.get("elder_name") and first_order.get("plan_name")), f"orders={m5_orders}")
+        m7_items_after_m5 = self._call("GET", "/m7-billing/items") or []
+        self._check("m5.order_auto_billing", any((x.get("item_name") or "").startswith("膳食供应") for x in m7_items_after_m5), f"items={m7_items_after_m5}")
 
         self._call("POST", "/m6-health/vitals", {"elder_id": elder["id"], "temperature": 36.6, "systolic": 122, "diastolic": 79, "pulse": 72})
         self._call("POST", "/m6-health/assessments", {"elder_id": elder["id"], "assessed_on": str(date.today()), "adl_score": 80, "mmse_score": 28, "risk_level": "low"})

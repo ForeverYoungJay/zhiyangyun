@@ -22,6 +22,12 @@
   - 联动：
     - `POST /m4-medication/executions` 成功后自动写入 M7 `billing_items` 并累计当月 `billing_invoices.total_amount`
 - M5 膳食：`/m5-meal/*`
+  - 新增：
+    - `GET /m5-meal/elders/suggest?keyword=...&limit=...`
+    - `GET /m5-meal/plans?page=...&page_size=...&keyword=...&meal_type=...`
+    - `GET /m5-meal/orders?page=...&page_size=...&keyword=...`
+  - 联动：
+    - `POST /m5-meal/orders` 成功后自动写入 M7 `billing_items` 并累计当月 `billing_invoices.total_amount`
 - M6 健康：`/m6-health/*`
 - M7 财务：`/m7-billing/*`
 

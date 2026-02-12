@@ -212,17 +212,116 @@ class MedicalService:
         db.refresh(execution)
         return execution
 
-    def list_meal_plans(self, db: Session, tenant_id: str):
-        return db.scalars(select(MealPlan).where(MealPlan.tenant_id == tenant_id)).all()
+    def list_meal_plans(
+        self,
+        db: Session,
+        tenant_id: str,
+        page: int = 1,
+        page_size: int = 10,
+        keyword: str = "",
+        meal_type: str = "",
+    ):
+        stmt = select(MealPlan).where(MealPlan.tenant_id == tenant_id)
+        if keyword:
+            like_kw = f"%{keyword.strip()}%"
+            stmt = stmt.where(or_(MealPlan.name.like(like_kw), MealPlan.nutrition_tag.like(like_kw), MealPlan.note.like(like_kw)))
+        if meal_type:
+            stmt = stmt.where(MealPlan.meal_type == meal_type)
+        rows = db.scalars(stmt.order_by(MealPlan.plan_date.desc(), MealPlan.id.desc())).all()
+        return self._pager([self._to_plain(x) for x in rows], page, page_size)
 
     def create_meal_plan(self, db: Session, tenant_id: str, payload: MealPlanCreate):
         return self._save(db, MealPlan(tenant_id=tenant_id, **payload.model_dump()))
 
-    def list_meal_orders(self, db: Session, tenant_id: str):
-        return db.scalars(select(MealOrder).where(MealOrder.tenant_id == tenant_id)).all()
+    def list_meal_orders(
+        self,
+        db: Session,
+        tenant_id: str,
+        page: int = 1,
+        page_size: int = 10,
+        keyword: str = "",
+        status: str = "",
+    ):
+        stmt = (
+            select(
+                MealOrder,
+                Elder.name.label("elder_name"),
+                Elder.elder_no.label("elder_no"),
+                MealPlan.name.label("plan_name"),
+                MealPlan.meal_type.label("meal_type"),
+                MealPlan.nutrition_tag.label("nutrition_tag"),
+            )
+            .join(Elder, Elder.id == MealOrder.elder_id)
+            .join(MealPlan, MealPlan.id == MealOrder.plan_id)
+            .where(MealOrder.tenant_id == tenant_id, Elder.tenant_id == tenant_id, MealPlan.tenant_id == tenant_id)
+        )
+        if keyword:
+            like_kw = f"%{keyword.strip()}%"
+            stmt = stmt.where(or_(Elder.name.like(like_kw), Elder.elder_no.like(like_kw), MealPlan.name.like(like_kw), MealPlan.nutrition_tag.like(like_kw)))
+        if status:
+            stmt = stmt.where(MealOrder.status == status)
+        rows = db.execute(stmt.order_by(MealOrder.id.desc())).all()
+        payload = [
+            {
+                **self._to_plain(order),
+                "elder_name": elder_name,
+                "elder_no": elder_no,
+                "plan_name": plan_name,
+                "meal_type": meal_type,
+                "nutrition_tag": nutrition_tag,
+            }
+            for order, elder_name, elder_no, plan_name, meal_type, nutrition_tag in rows
+        ]
+        return self._pager(payload, page, page_size)
 
     def create_meal_order(self, db: Session, tenant_id: str, payload: MealOrderCreate):
-        return self._save(db, MealOrder(tenant_id=tenant_id, **payload.model_dump()))
+        elder = self._resolve_elder(db, tenant_id, payload.elder_id)
+        if elder.status != "admitted":
+            raise ValueError("仅在院长者可下发膳食订单")
+
+        plan = db.scalar(select(MealPlan).where(MealPlan.tenant_id == tenant_id, MealPlan.id == payload.plan_id))
+        if not plan:
+            raise ValueError("膳食方案不存在")
+
+        today_order = db.scalar(
+            select(MealOrder)
+            .join(MealPlan, MealPlan.id == MealOrder.plan_id)
+            .where(
+                MealOrder.tenant_id == tenant_id,
+                MealOrder.elder_id == payload.elder_id,
+                MealPlan.plan_date == plan.plan_date,
+                MealPlan.meal_type == plan.meal_type,
+            )
+        )
+        if today_order:
+            raise ValueError("该长者同餐次膳食已下发，请勿重复")
+
+        order = MealOrder(tenant_id=tenant_id, **payload.model_dump())
+        db.add(order)
+
+        meal_fee = Decimal("18.00")
+        db.add(
+            BillingItem(
+                tenant_id=tenant_id,
+                elder_id=payload.elder_id,
+                item_name=f"膳食供应：{plan.name}",
+                amount=meal_fee,
+                charged_on=plan.plan_date,
+                status="unpaid",
+            )
+        )
+        self._upsert_invoice_total(db, tenant_id, payload.elder_id, plan.plan_date, meal_fee)
+
+        db.commit()
+        db.refresh(order)
+        return {
+            **self._to_plain(order),
+            "elder_name": elder.name,
+            "elder_no": elder.elder_no,
+            "plan_name": plan.name,
+            "meal_type": plan.meal_type,
+            "nutrition_tag": plan.nutrition_tag,
+        }
 
     def list_vitals(self, db: Session, tenant_id: str):
         return db.scalars(select(VitalSignRecord).where(VitalSignRecord.tenant_id == tenant_id)).all()
