@@ -61,6 +61,9 @@ class VitalSignRecord(Base, TenantBaseMixin):
     systolic: Mapped[int] = mapped_column(Integer, nullable=False, default=120)
     diastolic: Mapped[int] = mapped_column(Integer, nullable=False, default=80)
     pulse: Mapped[int] = mapped_column(Integer, nullable=False, default=75)
+    abnormal_level: Mapped[str] = mapped_column(String(20), nullable=False, default="normal")
+    abnormal_reason: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    followup_task_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("care_tasks.id"), nullable=True)
 
 
 class HealthAssessment(Base, TenantBaseMixin):
@@ -72,6 +75,10 @@ class HealthAssessment(Base, TenantBaseMixin):
     adl_score: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
     mmse_score: Mapped[int] = mapped_column(Integer, nullable=False, default=24)
     risk_level: Mapped[str] = mapped_column(String(20), nullable=False, default="medium")
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="open")
+    followup_task_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("care_tasks.id"), nullable=True)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    close_note: Mapped[str] = mapped_column(Text, nullable=False, default="")
 
 
 class BillingItem(Base, TenantBaseMixin):

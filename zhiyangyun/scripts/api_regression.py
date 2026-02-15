@@ -134,10 +134,23 @@ class Client:
         m7_items_after_m5 = self._call("GET", "/m7-billing/items") or []
         self._check("m5.order_auto_billing", any((x.get("item_name") or "").startswith("膳食供应") for x in m7_items_after_m5), f"items={m7_items_after_m5}")
 
-        self._call("POST", "/m6-health/vitals", {"elder_id": elder["id"], "temperature": 36.6, "systolic": 122, "diastolic": 79, "pulse": 72})
-        self._call("POST", "/m6-health/assessments", {"elder_id": elder["id"], "assessed_on": str(date.today()), "adl_score": 80, "mmse_score": 28, "risk_level": "low"})
-        self._call("GET", "/m6-health/vitals")
-        self._call("GET", "/m6-health/assessments")
+        self._call("POST", "/m6-health/vitals", {"elder_id": elder["id"], "temperature": 39.1, "systolic": 186, "diastolic": 113, "pulse": 128})
+        m6_vitals = self._call("GET", "/m6-health/vitals?page=1&page_size=5&keyword=回归") or {}
+        m6_vital_items = m6_vitals.get("items", []) if isinstance(m6_vitals, dict) else []
+        self._check("m6.vital_pagination_ready", isinstance(m6_vitals, dict) and "items" in m6_vitals and "total" in m6_vitals, f"vitals={m6_vitals}")
+        self._check("m6.vital_name_present", bool(m6_vital_items and m6_vital_items[0].get("elder_name")), f"vitals={m6_vitals}")
+        self._check("m6.vital_alert_rule_ready", bool(m6_vital_items and m6_vital_items[0].get("abnormal_level") in ["warning", "critical"]), f"vitals={m6_vitals}")
+
+        m6_high = self._call("POST", "/m6-health/assessments", {"elder_id": elder["id"], "assessed_on": str(date.today()), "adl_score": 35, "mmse_score": 16, "risk_level": "high"})
+        m6_assessments = self._call("GET", "/m6-health/assessments?page=1&page_size=5&keyword=回归") or {}
+        m6_assessment_items = m6_assessments.get("items", []) if isinstance(m6_assessments, dict) else []
+        self._check("m6.assessment_pagination_ready", isinstance(m6_assessments, dict) and "items" in m6_assessments and "total" in m6_assessments, f"assessments={m6_assessments}")
+        self._check("m6.assessment_name_present", bool(m6_assessment_items and m6_assessment_items[0].get("elder_name")), f"assessments={m6_assessments}")
+        self._check("m6.assessment_linkage_task_ready", bool(m6_high and m6_high.get("followup_task_id")), f"assessment={m6_high}")
+        if m6_high and m6_high.get("id"):
+            self._call("POST", f"/m6-health/assessments/{m6_high['id']}/close", {"note": "回归闭环"})
+            m6_closed = self._call("GET", "/m6-health/assessments?page=1&page_size=5&status=closed") or {}
+            self._check("m6.assessment_closed_loop_ready", isinstance(m6_closed, dict) and len(m6_closed.get("items", [])) > 0, f"closed={m6_closed}")
 
         self._call("POST", "/m7-billing/items", {"elder_id": elder["id"], "item_name": "手工补费", "amount": 19.9, "charged_on": str(date.today())})
         self._call("POST", "/m7-billing/invoices", {"elder_id": elder["id"], "period_month": date.today().strftime('%Y-%m'), "total_amount": 200})

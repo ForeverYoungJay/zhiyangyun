@@ -29,6 +29,14 @@
   - 联动：
     - `POST /m5-meal/orders` 成功后自动写入 M7 `billing_items` 并累计当月 `billing_invoices.total_amount`
 - M6 健康：`/m6-health/*`
+  - 新增：
+    - `GET /m6-health/elders/suggest?keyword=...&limit=...`
+    - `GET /m6-health/vitals?page=...&page_size=...&keyword=...&abnormal_level=...`
+    - `GET /m6-health/assessments?page=...&page_size=...&keyword=...&status=...`
+    - `POST /m6-health/assessments/{id}/close`
+  - 业务联动：
+    - `POST /m6-health/vitals` 命中异常规则后自动创建健康随访任务（M3）并发送 OA3 告警
+    - `POST /m6-health/assessments` 高风险时自动创建闭环任务并写入审批待办
 - M7 财务：`/m7-billing/*`
 
 ## A2

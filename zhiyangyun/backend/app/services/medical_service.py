@@ -14,6 +14,8 @@ from app.models.medical import (
     BillingItem,
     BillingInvoice,
 )
+from app.models.care import CareTask, ServiceItem
+from app.models.oa import ApprovalRequest, NotificationMessage
 from app.schemas.medical import (
     MedicationOrderCreate,
     MedicationExecutionCreate,
@@ -323,17 +325,184 @@ class MedicalService:
             "nutrition_tag": plan.nutrition_tag,
         }
 
-    def list_vitals(self, db: Session, tenant_id: str):
-        return db.scalars(select(VitalSignRecord).where(VitalSignRecord.tenant_id == tenant_id)).all()
+    def _ensure_followup_item(self, db: Session, tenant_id: str):
+        item = db.scalar(select(ServiceItem).where(ServiceItem.tenant_id == tenant_id, ServiceItem.name == "健康随访"))
+        if item:
+            return item
+        item = ServiceItem(tenant_id=tenant_id, name="健康随访", category="care", unit_price=0, duration_min=30, status="active")
+        db.add(item)
+        db.flush()
+        return item
 
-    def create_vital(self, db: Session, tenant_id: str, payload: VitalSignCreate):
-        return self._save(db, VitalSignRecord(tenant_id=tenant_id, **payload.model_dump()))
+    def _create_health_followup_task(self, db: Session, tenant_id: str, elder_id: str, user_id: str, description: str):
+        item = self._ensure_followup_item(db, tenant_id)
+        task = CareTask(
+            tenant_id=tenant_id,
+            elder_id=elder_id,
+            item_id=item.id,
+            task_type="health_followup",
+            created_by=user_id,
+            assigned_to=user_id,
+            scheduled_at=datetime.utcnow(),
+            status="pending",
+            issue_description=description,
+            report_to_dean=True,
+        )
+        db.add(task)
+        db.flush()
+        return task
 
-    def list_assessments(self, db: Session, tenant_id: str):
-        return db.scalars(select(HealthAssessment).where(HealthAssessment.tenant_id == tenant_id)).all()
+    def _create_health_alert(self, db: Session, tenant_id: str, title: str, content: str, biz_id: str, user_id: str):
+        db.add(NotificationMessage(tenant_id=tenant_id, title=title, content=content, channel="in_app", receiver_scope="all"))
+        db.add(ApprovalRequest(tenant_id=tenant_id, module="m6-health", biz_id=biz_id, applicant_id=user_id, note=content, status="pending"))
 
-    def create_assessment(self, db: Session, tenant_id: str, payload: HealthAssessmentCreate):
-        return self._save(db, HealthAssessment(tenant_id=tenant_id, **payload.model_dump()))
+    def _vital_abnormal_rule(self, payload: VitalSignCreate):
+        reasons = []
+        level = "normal"
+        if payload.temperature >= 38.5 or payload.temperature <= 35.5:
+            reasons.append(f"体温异常({payload.temperature}℃)")
+            level = "critical"
+        elif payload.temperature >= 37.3:
+            reasons.append(f"体温偏高({payload.temperature}℃)")
+            level = "warning"
+
+        if payload.systolic >= 180 or payload.diastolic >= 110 or payload.systolic <= 90:
+            reasons.append(f"血压异常({payload.systolic}/{payload.diastolic}mmHg)")
+            level = "critical"
+        elif payload.systolic >= 140 or payload.diastolic >= 90:
+            reasons.append(f"血压偏高({payload.systolic}/{payload.diastolic}mmHg)")
+            level = "warning" if level == "normal" else level
+
+        if payload.pulse >= 120 or payload.pulse <= 50:
+            reasons.append(f"脉搏异常({payload.pulse}次/分)")
+            level = "critical" if (payload.pulse >= 130 or payload.pulse <= 45) else ("warning" if level == "normal" else level)
+
+        return level, "；".join(reasons)
+
+    def list_vitals(
+        self,
+        db: Session,
+        tenant_id: str,
+        page: int = 1,
+        page_size: int = 10,
+        keyword: str = "",
+        abnormal_level: str = "",
+    ):
+        stmt = (
+            select(VitalSignRecord, Elder.name.label("elder_name"), Elder.elder_no.label("elder_no"))
+            .join(Elder, Elder.id == VitalSignRecord.elder_id)
+            .where(VitalSignRecord.tenant_id == tenant_id, Elder.tenant_id == tenant_id)
+        )
+        if keyword:
+            like_kw = f"%{keyword.strip()}%"
+            stmt = stmt.where(or_(Elder.name.like(like_kw), Elder.elder_no.like(like_kw), VitalSignRecord.abnormal_reason.like(like_kw)))
+        if abnormal_level:
+            stmt = stmt.where(VitalSignRecord.abnormal_level == abnormal_level)
+
+        rows = db.execute(stmt.order_by(VitalSignRecord.recorded_at.desc(), VitalSignRecord.id.desc())).all()
+        payload = []
+        for vital, elder_name, elder_no in rows:
+            payload.append({**self._to_plain(vital), "elder_name": elder_name, "elder_no": elder_no})
+        return self._pager(payload, page, page_size)
+
+    def create_vital(self, db: Session, tenant_id: str, payload: VitalSignCreate, user_id: str):
+        elder = self._resolve_elder(db, tenant_id, payload.elder_id)
+        abnormal_level, abnormal_reason = self._vital_abnormal_rule(payload)
+        vital = VitalSignRecord(
+            tenant_id=tenant_id,
+            **payload.model_dump(),
+            abnormal_level=abnormal_level,
+            abnormal_reason=abnormal_reason,
+        )
+        db.add(vital)
+        db.flush()
+
+        if abnormal_level in ["warning", "critical"]:
+            followup = self._create_health_followup_task(
+                db,
+                tenant_id,
+                payload.elder_id,
+                user_id,
+                f"生命体征{abnormal_level}：{abnormal_reason}",
+            )
+            vital.followup_task_id = followup.id
+            self._create_health_alert(
+                db,
+                tenant_id,
+                title=f"生命体征{abnormal_level}告警：{elder.name}",
+                content=f"{elder.name}({elder.elder_no}) {abnormal_reason}，已自动生成随访任务。",
+                biz_id=vital.id,
+                user_id=user_id,
+            )
+
+        db.commit()
+        db.refresh(vital)
+        return {**self._to_plain(vital), "elder_name": elder.name, "elder_no": elder.elder_no}
+
+    def list_assessments(
+        self,
+        db: Session,
+        tenant_id: str,
+        page: int = 1,
+        page_size: int = 10,
+        keyword: str = "",
+        status: str = "",
+    ):
+        stmt = (
+            select(HealthAssessment, Elder.name.label("elder_name"), Elder.elder_no.label("elder_no"))
+            .join(Elder, Elder.id == HealthAssessment.elder_id)
+            .where(HealthAssessment.tenant_id == tenant_id, Elder.tenant_id == tenant_id)
+        )
+        if keyword:
+            like_kw = f"%{keyword.strip()}%"
+            stmt = stmt.where(or_(Elder.name.like(like_kw), Elder.elder_no.like(like_kw), HealthAssessment.risk_level.like(like_kw), HealthAssessment.close_note.like(like_kw)))
+        if status:
+            stmt = stmt.where(HealthAssessment.status == status)
+        rows = db.execute(stmt.order_by(HealthAssessment.assessed_on.desc(), HealthAssessment.id.desc())).all()
+        payload = []
+        for assessment, elder_name, elder_no in rows:
+            payload.append({**self._to_plain(assessment), "elder_name": elder_name, "elder_no": elder_no})
+        return self._pager(payload, page, page_size)
+
+    def create_assessment(self, db: Session, tenant_id: str, payload: HealthAssessmentCreate, user_id: str):
+        elder = self._resolve_elder(db, tenant_id, payload.elder_id)
+        assessment = HealthAssessment(tenant_id=tenant_id, **payload.model_dump(), status="open")
+        db.add(assessment)
+        db.flush()
+
+        need_followup = payload.risk_level in ["high", "critical"] or payload.adl_score < 40 or payload.mmse_score < 18
+        if need_followup:
+            task = self._create_health_followup_task(
+                db,
+                tenant_id,
+                payload.elder_id,
+                user_id,
+                f"健康评估高风险：risk={payload.risk_level}, ADL={payload.adl_score}, MMSE={payload.mmse_score}",
+            )
+            assessment.followup_task_id = task.id
+            self._create_health_alert(
+                db,
+                tenant_id,
+                title=f"健康评估高风险：{elder.name}",
+                content=f"{elder.name}({elder.elder_no})评估风险{payload.risk_level}，已自动生成闭环随访任务。",
+                biz_id=assessment.id,
+                user_id=user_id,
+            )
+
+        db.commit()
+        db.refresh(assessment)
+        return {**self._to_plain(assessment), "elder_name": elder.name, "elder_no": elder.elder_no}
+
+    def close_assessment(self, db: Session, tenant_id: str, assessment_id: str, note: str = ""):
+        obj = db.scalar(select(HealthAssessment).where(HealthAssessment.tenant_id == tenant_id, HealthAssessment.id == assessment_id))
+        if not obj:
+            raise ValueError("评估记录不存在")
+        obj.status = "closed"
+        obj.closed_at = datetime.utcnow()
+        obj.close_note = note
+        db.commit()
+        db.refresh(obj)
+        return obj
 
     def list_billing_items(self, db: Session, tenant_id: str):
         return db.scalars(select(BillingItem).where(BillingItem.tenant_id == tenant_id)).all()

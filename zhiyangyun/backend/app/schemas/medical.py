@@ -45,6 +45,10 @@ class HealthAssessmentCreate(BaseModel):
     risk_level: str = "medium"
 
 
+class AssessmentClosePayload(BaseModel):
+    note: str = ""
+
+
 class BillingItemCreate(BaseModel):
     elder_id: str
     item_name: str
