@@ -1,6 +1,6 @@
 from datetime import datetime, date
 from decimal import Decimal
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, and_
 from sqlalchemy.orm import Session
 
 from app.models.elder import Elder
@@ -13,6 +13,7 @@ from app.models.medical import (
     HealthAssessment,
     BillingItem,
     BillingInvoice,
+    BillingEvent,
 )
 from app.models.care import CareTask, ServiceItem
 from app.models.oa import ApprovalRequest, NotificationMessage
@@ -25,6 +26,9 @@ from app.schemas.medical import (
     HealthAssessmentCreate,
     BillingItemCreate,
     BillingInvoiceCreate,
+    BillingInvoiceGenerate,
+    BillingInvoiceWriteoff,
+    BillingInvoiceException,
 )
 
 
@@ -504,16 +508,271 @@ class MedicalService:
         db.refresh(obj)
         return obj
 
-    def list_billing_items(self, db: Session, tenant_id: str):
-        return db.scalars(select(BillingItem).where(BillingItem.tenant_id == tenant_id)).all()
+    def list_billing_items(
+        self,
+        db: Session,
+        tenant_id: str,
+        page: int = 1,
+        page_size: int = 10,
+        keyword: str = "",
+        status: str = "",
+        elder_id: str = "",
+        start_date: str = "",
+        end_date: str = "",
+    ):
+        stmt = (
+            select(BillingItem, Elder.name.label("elder_name"), Elder.elder_no.label("elder_no"))
+            .join(Elder, Elder.id == BillingItem.elder_id)
+            .where(BillingItem.tenant_id == tenant_id, Elder.tenant_id == tenant_id)
+        )
+        if keyword:
+            like_kw = f"%{keyword.strip()}%"
+            stmt = stmt.where(or_(BillingItem.item_name.like(like_kw), Elder.name.like(like_kw), Elder.elder_no.like(like_kw)))
+        if status:
+            stmt = stmt.where(BillingItem.status == status)
+        if elder_id:
+            stmt = stmt.where(BillingItem.elder_id == elder_id)
+        if start_date:
+            stmt = stmt.where(BillingItem.charged_on >= start_date)
+        if end_date:
+            stmt = stmt.where(BillingItem.charged_on <= end_date)
+
+        rows = db.execute(stmt.order_by(BillingItem.charged_on.desc(), BillingItem.id.desc())).all()
+        payload = [
+            {**self._to_plain(item), "elder_name": elder_name, "elder_no": elder_no}
+            for item, elder_name, elder_no in rows
+        ]
+        return self._pager(payload, page, page_size)
 
     def create_billing_item(self, db: Session, tenant_id: str, payload: BillingItemCreate):
-        return self._save(db, BillingItem(tenant_id=tenant_id, **payload.model_dump()))
+        elder = self._resolve_elder(db, tenant_id, payload.elder_id)
+        obj = BillingItem(tenant_id=tenant_id, status="unpaid", **payload.model_dump())
+        saved = self._save(db, obj)
+        return {**self._to_plain(saved), "elder_name": elder.name, "elder_no": elder.elder_no}
 
-    def list_invoices(self, db: Session, tenant_id: str):
-        return db.scalars(select(BillingInvoice).where(BillingInvoice.tenant_id == tenant_id)).all()
+    def _invoice_status_from_amount(self, total_amount: Decimal, paid_amount: Decimal, current_status: str = "open"):
+        if current_status in ["disputed", "waived"]:
+            return current_status
+        if paid_amount <= 0:
+            return "open"
+        if paid_amount < total_amount:
+            return "partial"
+        return "paid"
+
+    def _save_event(self, db: Session, tenant_id: str, invoice_id: str, event_type: str, amount: Decimal = Decimal("0"), note: str = "", user_id: str | None = None):
+        db.add(BillingEvent(
+            tenant_id=tenant_id,
+            invoice_id=invoice_id,
+            event_type=event_type,
+            amount=amount,
+            note=note,
+            created_by=user_id,
+        ))
+
+    def _month_range(self, period_month: str):
+        month_start = datetime.strptime(f"{period_month}-01", "%Y-%m-%d").date()
+        if month_start.month == 12:
+            month_end = date(month_start.year + 1, 1, 1)
+        else:
+            month_end = date(month_start.year, month_start.month + 1, 1)
+        return month_start, month_end
+
+    def list_invoices(
+        self,
+        db: Session,
+        tenant_id: str,
+        page: int = 1,
+        page_size: int = 10,
+        keyword: str = "",
+        status: str = "",
+        elder_id: str = "",
+        period_month: str = "",
+    ):
+        stmt = (
+            select(BillingInvoice, Elder.name.label("elder_name"), Elder.elder_no.label("elder_no"))
+            .join(Elder, Elder.id == BillingInvoice.elder_id)
+            .where(BillingInvoice.tenant_id == tenant_id, Elder.tenant_id == tenant_id)
+        )
+        if keyword:
+            like_kw = f"%{keyword.strip()}%"
+            stmt = stmt.where(or_(Elder.name.like(like_kw), Elder.elder_no.like(like_kw), BillingInvoice.period_month.like(like_kw)))
+        if status:
+            stmt = stmt.where(BillingInvoice.status == status)
+        if elder_id:
+            stmt = stmt.where(BillingInvoice.elder_id == elder_id)
+        if period_month:
+            stmt = stmt.where(BillingInvoice.period_month == period_month)
+
+        rows = db.execute(stmt.order_by(BillingInvoice.period_month.desc(), BillingInvoice.id.desc())).all()
+        payload = [
+            {
+                **self._to_plain(invoice),
+                "elder_name": elder_name,
+                "elder_no": elder_no,
+                "unpaid_amount": float(Decimal(str(invoice.total_amount)) - Decimal(str(invoice.paid_amount))),
+            }
+            for invoice, elder_name, elder_no in rows
+        ]
+        return self._pager(payload, page, page_size)
 
     def create_invoice(self, db: Session, tenant_id: str, payload: BillingInvoiceCreate):
-        body = payload.model_dump()
-        body["paid_amount"] = 0
-        return self._save(db, BillingInvoice(tenant_id=tenant_id, **body))
+        elder = self._resolve_elder(db, tenant_id, payload.elder_id)
+        existed = db.scalar(select(BillingInvoice).where(
+            BillingInvoice.tenant_id == tenant_id,
+            BillingInvoice.elder_id == payload.elder_id,
+            BillingInvoice.period_month == payload.period_month,
+        ))
+        if existed:
+            raise ValueError("该长者账期发票已存在，请改用账单生成或核销流程")
+        total_amount = Decimal(str(payload.total_amount))
+        obj = BillingInvoice(
+            tenant_id=tenant_id,
+            elder_id=payload.elder_id,
+            period_month=payload.period_month,
+            total_amount=total_amount,
+            paid_amount=Decimal("0"),
+            status="open",
+        )
+        db.add(obj)
+        db.flush()
+        self._save_event(db, tenant_id, obj.id, "created", amount=total_amount, note="手工创建发票")
+        db.commit()
+        db.refresh(obj)
+        return {**self._to_plain(obj), "elder_name": elder.name, "elder_no": elder.elder_no}
+
+    def generate_invoice(self, db: Session, tenant_id: str, payload: BillingInvoiceGenerate, user_id: str):
+        elder = self._resolve_elder(db, tenant_id, payload.elder_id)
+        existed = db.scalar(select(BillingInvoice).where(
+            BillingInvoice.tenant_id == tenant_id,
+            BillingInvoice.elder_id == payload.elder_id,
+            BillingInvoice.period_month == payload.period_month,
+        ))
+        if existed:
+            raise ValueError("发票已存在，请直接核销或异常处理")
+        month_start, month_end = self._month_range(payload.period_month)
+        month_amount = db.scalar(select(func.coalesce(func.sum(BillingItem.amount), 0)).where(
+            BillingItem.tenant_id == tenant_id,
+            BillingItem.elder_id == payload.elder_id,
+            BillingItem.charged_on >= month_start,
+            BillingItem.charged_on < month_end,
+            BillingItem.status != "waived",
+        )) or 0
+        total_amount = Decimal(str(month_amount))
+        invoice = BillingInvoice(
+            tenant_id=tenant_id,
+            elder_id=payload.elder_id,
+            period_month=payload.period_month,
+            total_amount=total_amount,
+            paid_amount=Decimal("0"),
+            status="open",
+        )
+        db.add(invoice)
+        db.flush()
+        self._save_event(db, tenant_id, invoice.id, "generated", total_amount, "系统按账单生成", user_id)
+        db.commit()
+        db.refresh(invoice)
+        return {**self._to_plain(invoice), "elder_name": elder.name, "elder_no": elder.elder_no}
+
+    def writeoff_invoice(self, db: Session, tenant_id: str, invoice_id: str, payload: BillingInvoiceWriteoff, user_id: str):
+        invoice = db.scalar(select(BillingInvoice).where(BillingInvoice.tenant_id == tenant_id, BillingInvoice.id == invoice_id))
+        if not invoice:
+            raise ValueError("发票不存在")
+        if invoice.status in ["waived"]:
+            raise ValueError("已豁免发票不可核销")
+        amount = Decimal(str(payload.amount))
+        if amount <= 0:
+            raise ValueError("核销金额必须大于0")
+        total_amount = Decimal(str(invoice.total_amount))
+        paid_amount = Decimal(str(invoice.paid_amount)) + amount
+        if paid_amount > total_amount:
+            raise ValueError("核销金额超过应收总额")
+        invoice.paid_amount = paid_amount
+        invoice.status = self._invoice_status_from_amount(total_amount, paid_amount, invoice.status)
+
+        month_start, month_end = self._month_range(invoice.period_month)
+        if invoice.status == "paid":
+            db.execute(
+                BillingItem.__table__.update().where(
+                    and_(
+                        BillingItem.tenant_id == tenant_id,
+                        BillingItem.elder_id == invoice.elder_id,
+                        BillingItem.charged_on >= month_start,
+                        BillingItem.charged_on < month_end,
+                        BillingItem.status.in_(["unpaid", "partial", "overdue"]),
+                    )
+                ).values(status="paid")
+            )
+        elif invoice.status == "partial":
+            db.execute(
+                BillingItem.__table__.update().where(
+                    and_(
+                        BillingItem.tenant_id == tenant_id,
+                        BillingItem.elder_id == invoice.elder_id,
+                        BillingItem.charged_on >= month_start,
+                        BillingItem.charged_on < month_end,
+                        BillingItem.status == "unpaid",
+                    )
+                ).values(status="partial")
+            )
+        # partial 状态仅影响当月未付账单条目
+        self._save_event(db, tenant_id, invoice.id, "writeoff", amount, payload.note, user_id)
+        db.commit()
+        db.refresh(invoice)
+        return invoice
+
+    def handle_invoice_exception(self, db: Session, tenant_id: str, invoice_id: str, payload: BillingInvoiceException, user_id: str):
+        invoice = db.scalar(select(BillingInvoice).where(BillingInvoice.tenant_id == tenant_id, BillingInvoice.id == invoice_id))
+        if not invoice:
+            raise ValueError("发票不存在")
+        mapping = {
+            "mark_overdue": "overdue",
+            "mark_disputed": "disputed",
+            "waive": "waived",
+            "reopen": "open",
+        }
+        if payload.action not in mapping:
+            raise ValueError("不支持的异常动作")
+        next_status = mapping[payload.action]
+        if payload.action == "reopen" and invoice.status not in ["overdue", "disputed"]:
+            raise ValueError("仅逾期/争议发票可重开")
+        if payload.action == "waive" and Decimal(str(invoice.paid_amount)) > 0:
+            raise ValueError("已有核销金额的发票不可直接豁免")
+
+        invoice.status = next_status
+        event_amount = Decimal("0")
+        month_start, month_end = self._month_range(invoice.period_month)
+        if next_status == "waived":
+            event_amount = Decimal(str(invoice.total_amount))
+            db.execute(
+                BillingItem.__table__.update().where(
+                    and_(
+                        BillingItem.tenant_id == tenant_id,
+                        BillingItem.elder_id == invoice.elder_id,
+                        BillingItem.charged_on >= month_start,
+                        BillingItem.charged_on < month_end,
+                        BillingItem.status.in_(["unpaid", "partial", "overdue"]),
+                    )
+                ).values(status="waived")
+            )
+        elif next_status == "overdue":
+            db.execute(
+                BillingItem.__table__.update().where(
+                    and_(
+                        BillingItem.tenant_id == tenant_id,
+                        BillingItem.elder_id == invoice.elder_id,
+                        BillingItem.charged_on >= month_start,
+                        BillingItem.charged_on < month_end,
+                        BillingItem.status.in_(["unpaid", "partial"]),
+                    )
+                ).values(status="overdue")
+            )
+        elif next_status == "open":
+            invoice.status = self._invoice_status_from_amount(Decimal(str(invoice.total_amount)), Decimal(str(invoice.paid_amount)), "open")
+        self._save_event(db, tenant_id, invoice.id, payload.action, event_amount, payload.note, user_id)
+        db.commit()
+        db.refresh(invoice)
+        return invoice
+
+    def list_invoice_events(self, db: Session, tenant_id: str, invoice_id: str):
+        rows = db.scalars(select(BillingEvent).where(BillingEvent.tenant_id == tenant_id, BillingEvent.invoice_id == invoice_id).order_by(BillingEvent.created_at.desc(), BillingEvent.id.desc())).all()
+        return [self._to_plain(x) for x in rows]

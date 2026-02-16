@@ -153,9 +153,27 @@ class Client:
             self._check("m6.assessment_closed_loop_ready", isinstance(m6_closed, dict) and len(m6_closed.get("items", [])) > 0, f"closed={m6_closed}")
 
         self._call("POST", "/m7-billing/items", {"elder_id": elder["id"], "item_name": "手工补费", "amount": 19.9, "charged_on": str(date.today())})
-        self._call("POST", "/m7-billing/invoices", {"elder_id": elder["id"], "period_month": date.today().strftime('%Y-%m'), "total_amount": 200})
-        self._call("GET", "/m7-billing/items")
-        self._call("GET", "/m7-billing/invoices")
+        m7_paged_items = self._call("GET", "/m7-billing/items?page=1&page_size=10&keyword=回归&status=unpaid") or {}
+        self._check("m7.items_pagination_ready", isinstance(m7_paged_items, dict) and "items" in m7_paged_items and "total" in m7_paged_items, f"items={m7_paged_items}")
+        first_m7_item = (m7_paged_items.get("items") or [{}])[0] if isinstance(m7_paged_items, dict) else {}
+        self._check("m7.items_name_present", bool(first_m7_item.get("elder_name") and first_m7_item.get("elder_no")), f"items={m7_paged_items}")
+
+        period = date.today().strftime('%Y-%m')
+        m7_generated = self._call("POST", "/m7-billing/invoices/generate", {"elder_id": elder["id"], "period_month": period}) or {}
+        self._check("m7.invoice_generated", bool(m7_generated.get("id")), f"invoice={m7_generated}")
+        m7_writeoff = self._call("POST", f"/m7-billing/invoices/{m7_generated.get('id')}/writeoff", {"amount": 10, "note": "回归部分核销"}) or {}
+        self._check("m7.invoice_writeoff_partial", m7_writeoff.get("status") == "partial", f"writeoff={m7_writeoff}")
+        m7_overdue = self._call("POST", f"/m7-billing/invoices/{m7_generated.get('id')}/exception", {"action": "mark_overdue", "note": "回归逾期"}) or {}
+        self._check("m7.invoice_exception_overdue", m7_overdue.get("status") == "overdue", f"overdue={m7_overdue}")
+        m7_reopen = self._call("POST", f"/m7-billing/invoices/{m7_generated.get('id')}/exception", {"action": "reopen", "note": "回归重开"}) or {}
+        self._check("m7.invoice_status_reopen", m7_reopen.get("status") in ["open", "partial"], f"reopen={m7_reopen}")
+        m7_events = self._call("GET", f"/m7-billing/invoices/{m7_generated.get('id')}/events") or []
+        self._check("m7.invoice_event_trace_ready", len(m7_events) >= 3, f"events={m7_events}")
+
+        m7_paged_invoices = self._call("GET", f"/m7-billing/invoices?page=1&page_size=10&period_month={period}") or {}
+        self._check("m7.invoice_pagination_ready", isinstance(m7_paged_invoices, dict) and "items" in m7_paged_invoices and "total" in m7_paged_invoices, f"invoices={m7_paged_invoices}")
+        first_invoice = (m7_paged_invoices.get("items") or [{}])[0] if isinstance(m7_paged_invoices, dict) else {}
+        self._check("m7.invoice_name_present", bool(first_invoice.get("elder_name") and first_invoice.get("unpaid_amount") is not None), f"invoices={m7_paged_invoices}")
 
         shift = self._call("POST", "/oa1-shift/templates", {"name": "早班", "start_time": "08:00", "end_time": "16:00"})
         self._call("POST", "/oa1-shift/assignments", {"shift_id": shift["id"], "user_id": login["user_id"], "duty_date": str(date.today())})

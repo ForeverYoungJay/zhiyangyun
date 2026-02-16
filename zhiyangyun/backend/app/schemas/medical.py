@@ -59,7 +59,22 @@ class BillingItemCreate(BaseModel):
 class BillingInvoiceCreate(BaseModel):
     elder_id: str
     period_month: str
-    total_amount: float
+    total_amount: float = 0
+
+
+class BillingInvoiceGenerate(BaseModel):
+    elder_id: str
+    period_month: str
+
+
+class BillingInvoiceWriteoff(BaseModel):
+    amount: float
+    note: str = ""
+
+
+class BillingInvoiceException(BaseModel):
+    action: str
+    note: str = ""
 
 
 class MedicationOrderOut(MedicationOrderCreate):

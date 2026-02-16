@@ -101,3 +101,15 @@ class BillingInvoice(Base, TenantBaseMixin):
     total_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     paid_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="open")
+
+
+class BillingEvent(Base, TenantBaseMixin):
+    __tablename__ = "billing_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    invoice_id: Mapped[str] = mapped_column(String(36), ForeignKey("billing_invoices.id"), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    note: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)

@@ -38,6 +38,14 @@
     - `POST /m6-health/vitals` 命中异常规则后自动创建健康随访任务（M3）并发送 OA3 告警
     - `POST /m6-health/assessments` 高风险时自动创建闭环任务并写入审批待办
 - M7 财务：`/m7-billing/*`
+  - 列表查询：
+    - `GET /m7-billing/items?page=...&page_size=...&keyword=...&status=...&elder_id=...`
+    - `GET /m7-billing/invoices?page=...&page_size=...&keyword=...&status=...&period_month=...`
+  - 收费业务流：
+    - `POST /m7-billing/invoices/generate`（按账单自动生成月度发票）
+    - `POST /m7-billing/invoices/{id}/writeoff`（核销，支持部分/全额）
+    - `POST /m7-billing/invoices/{id}/exception`（逾期/争议/豁免/重开）
+    - `GET /m7-billing/invoices/{id}/events`（状态流转与操作留痕）
 
 ## A2
 - OA1 排班：`/oa1-shift/*`

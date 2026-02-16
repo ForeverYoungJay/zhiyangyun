@@ -69,11 +69,17 @@ docker compose run --rm seed
 - `GET /api/v1/elders/overview/summary`
 - `GET /api/v1/elders/audit/bed-sync`
 - `GET /api/v1/care/governance-summary`
+- `GET /api/v1/m7-billing/items?page=...&page_size=...&keyword=...&status=...`
+- `GET /api/v1/m7-billing/invoices?page=...&page_size=...&keyword=...&status=...`
+- `POST /api/v1/m7-billing/invoices/generate`
+- `POST /api/v1/m7-billing/invoices/{id}/writeoff`
+- `POST /api/v1/m7-billing/invoices/{id}/exception`
+- `GET /api/v1/m7-billing/invoices/{id}/events`
 
 ## 前端联调入口
 - `M2 长者全周期管理`：建档+入院/转床/退院
 - `M3 服务与护理标准化`：任务扫码开始/完成、监督评分（扫码值会自动取长者床位二维码）
-- `A1-M7 费用管理`：可见自动扣费后的明细与发票
+- `A1-M7 费用管理`：收费业务闭环（账单明细分页检索、发票生成、核销、异常处理、事件流水）
 - `B2 家属门户`：查看账单、护理记录、提交问卷评价
 - `B3 运营看板`：展示实时绩效汇总 + 历史指标
 
@@ -87,6 +93,7 @@ docker compose run --rm seed
 - `docs/07-部署运维.md`
 - `docs/08-测试与验收手册.md`
 - `docs/09-变更日志.md`
+- `docs/10-OA1-自动准备清单.md`
 
 ## 商城+库存（本次优先补齐）
 ### 能力清单
@@ -230,6 +237,8 @@ curl -s -X POST http://localhost:8000/api/v1/auth/login \
 - `2026021118_m6_health_upgrade.py`
   - 生命体征异常级别/异常原因/随访任务关联字段
   - 健康评估闭环状态、闭环时间、闭环备注字段
+- `2026021119_m7_billing_events.py`
+  - 新增收费事件表 `billing_events`（生成/核销/异常处理全程留痕）
 
 如本地已启动旧库，请先执行：
 ```bash
