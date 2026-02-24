@@ -51,10 +51,15 @@
 - OA1 排班：`/oa1-shift/*`
   - 列表查询：
     - `GET /oa1-shift/templates?page=...&page_size=...&keyword=...&status=...`
-    - `GET /oa1-shift/assignments?page=...&page_size=...&keyword=...&status=...&shift_id=...&user_id=...&duty_date=...`
+    - `GET /oa1-shift/assignments?page=...&page_size=...&keyword=...&status=...&shift_id=...&user_id=...&duty_date=...&start_date=...&end_date=...`
+  - 业务规则：
+    - `POST /oa1-shift/templates` 校验时间合法（开始时间 < 结束时间）与模板去重（同名同时间）
+    - `POST /oa1-shift/assignments` 校验不可排过去日期，同人同日班次冲突自动拦截
   - 状态流转：
     - `POST /oa1-shift/assignments/{id}/status`（`publish/execute/mark_exception/reopen`）
-  - 姓名化字段：`user_name/username/shift_name`
+    - 发布动作自动联动 OA2：生成 `module=oa1_shift` 审批待办（pending）
+  - 姓名化字段：`user_name/display_name/username/shift_name`
+
 - OA2 审批：`/oa2-approval/*`
 - OA3 通知：`/oa3-notification/*`
 - OA4 培训：`/oa4-training/*`

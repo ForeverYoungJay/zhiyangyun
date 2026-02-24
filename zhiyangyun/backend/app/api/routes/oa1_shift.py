@@ -25,7 +25,10 @@ def list_templates(
 
 @router.post("/templates", response_model=ApiResponse)
 def create_template(payload: ShiftTemplateCreate, db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
-    return ApiResponse(message="created", data=service.create_shift(db, current.tenant_id, payload))
+    try:
+        return ApiResponse(message="created", data=service.create_shift(db, current.tenant_id, payload))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/assignments", response_model=ApiResponse)
@@ -37,10 +40,12 @@ def list_assignments(
     shift_id: str = Query(default=""),
     user_id: str = Query(default=""),
     duty_date: str = Query(default=""),
+    start_date: str = Query(default=""),
+    end_date: str = Query(default=""),
     db: Session = Depends(get_db),
     current: CurrentUser = Depends(get_current_user),
 ):
-    return ApiResponse(data=service.list_assignments(db, current.tenant_id, page, page_size, keyword, status, shift_id, user_id, duty_date))
+    return ApiResponse(data=service.list_assignments(db, current.tenant_id, page, page_size, keyword, status, shift_id, user_id, duty_date, start_date, end_date))
 
 
 @router.post("/assignments", response_model=ApiResponse)
@@ -59,6 +64,6 @@ def update_assignment_status(
     current: CurrentUser = Depends(get_current_user),
 ):
     try:
-        return ApiResponse(message="updated", data=service.update_assignment_status(db, current.tenant_id, assignment_id, payload))
+        return ApiResponse(message="updated", data=service.update_assignment_status(db, current.tenant_id, assignment_id, payload, current.user_id))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

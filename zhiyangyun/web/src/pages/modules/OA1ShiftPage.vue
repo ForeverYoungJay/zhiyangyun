@@ -9,7 +9,7 @@
 
     <el-alert type="info" :closable="false" show-icon>
       <template #title>流程提示</template>
-      <div>• 先创建模板，再创建排班；• 支持搜索/筛选/分页；• 排班状态支持发布、执行、异常、重开。</div>
+      <div>• 先创建模板，再创建排班；• 支持搜索/筛选/分页；• 自动冲突检测；• 发布时自动进入审批待办。</div>
     </el-alert>
 
     <el-card class="zy-card" style="margin-top: 12px;">
@@ -72,13 +72,31 @@
             <el-option label="异常" value="exception" />
           </el-select>
         </el-form-item>
+        <el-form-item label="班次ID">
+          <el-input v-model="assignmentQuery.shift_id" clearable placeholder="可选" style="width:180px" @change="loadAssignments"/>
+        </el-form-item>
+        <el-form-item label="人员ID">
+          <el-input v-model="assignmentQuery.user_id" clearable placeholder="可选" style="width:180px" @change="loadAssignments"/>
+        </el-form-item>
+        <el-form-item label="日期区间">
+          <el-date-picker
+            v-model="assignmentDateRange"
+            type="daterange"
+            value-format="YYYY-MM-DD"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            style="width:260px"
+            @change="onDateRangeChange"
+          />
+        </el-form-item>
         <el-button @click="loadAssignments">查询</el-button>
       </el-form>
 
       <el-table :data="assignments.items" border>
         <el-table-column prop="duty_date" label="值班日期" width="130" />
         <el-table-column prop="shift_name" label="班次" min-width="140" />
-        <el-table-column prop="user_name" label="人员姓名" min-width="120" />
+        <el-table-column prop="display_name" label="人员" min-width="120" />
         <el-table-column prop="username" label="账号" min-width="120" />
         <el-table-column prop="status" label="状态" width="120">
           <template #default="{ row }"><el-tag>{{ statusText(row.status) }}</el-tag></template>
@@ -109,7 +127,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../../api/http'
 
@@ -117,11 +135,18 @@ const templates = reactive<any>({ items: [], total: 0 })
 const assignments = reactive<any>({ items: [], total: 0 })
 
 const templateQuery = reactive({ page: 1, page_size: 10, keyword: '', status: '' })
-const assignmentQuery = reactive({ page: 1, page_size: 10, keyword: '', status: '' })
+const assignmentQuery = reactive({ page: 1, page_size: 10, keyword: '', status: '', shift_id: '', user_id: '', start_date: '', end_date: '' })
+const assignmentDateRange = ref<string[]>([])
 
 const loadTemplates = async () => {
   const resp = await http.get('/oa1-shift/templates', { params: templateQuery })
   Object.assign(templates, resp.data.data || { items: [], total: 0 })
+}
+
+const onDateRangeChange = (value: string[] | null) => {
+  assignmentQuery.start_date = value?.[0] || ''
+  assignmentQuery.end_date = value?.[1] || ''
+  loadAssignments()
 }
 
 const loadAssignments = async () => {
@@ -147,9 +172,13 @@ const createAssignment = async () => {
   const { value } = await ElMessageBox.prompt('请输入值班人员 user_id（可从其他模块复制）', '新建排班')
   const shift = templates.items[0]
   const today = new Date().toISOString().slice(0, 10)
-  await http.post('/oa1-shift/assignments', { shift_id: shift.id, user_id: value, duty_date: today, status: 'draft' })
-  ElMessage.success('排班已创建')
-  await loadAssignments()
+  try {
+    await http.post('/oa1-shift/assignments', { shift_id: shift.id, user_id: value, duty_date: today, status: 'draft' })
+    ElMessage.success('排班已创建')
+    await loadAssignments()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '排班创建失败')
+  }
 }
 
 const doStatus = async (row: any, action: string) => {

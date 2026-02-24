@@ -4,14 +4,15 @@ import sys
 from datetime import date, datetime, timezone
 from urllib import request, error, parse
 
-BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8000/api/v1"
+CLI_ARGS = sys.argv[1:]
+BASE = next((x for x in CLI_ARGS if not x.startswith("--")), "http://localhost:8000/api/v1")
 
 
 class Client:
     def __init__(self):
         self.token = ""
         self.results = []
-        self.strict = "--strict" in sys.argv
+        self.strict = "--strict" in CLI_ARGS
 
     def _build_url(self, path: str) -> str:
         if "?" not in path:
@@ -48,6 +49,9 @@ class Client:
             msg = e.read().decode("utf-8")
             if e.code == 404 and not self.strict:
                 self.results.append((method, path, True, "SKIP(404 in non-strict mode)"))
+                return None
+            if e.code == expect:
+                self.results.append((method, path, True, f"HTTP {e.code}(expected)"))
                 return None
             self.results.append((method, path, False, f"HTTP {e.code}: {msg}"))
         except Exception as e:
