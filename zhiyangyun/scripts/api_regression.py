@@ -257,13 +257,15 @@ class Client:
             self._check("oa2.logs_ready", len(oa2_logs) >= 2, f"logs={oa2_logs}")
 
         oa3_msg = self._call("POST", "/oa3-notification/messages", {"title": "交班", "content": "请查看", "channel": "in_app", "receiver_scope": "single", "target_user_id": login["user_id"], "strategy": "queued"}) or {}
-        oa3_list = self._call("GET", "/oa3-notification/messages?page=1&page_size=5&keyword=交班&status=pending&channel=in_app") or {}
+        oa3_list = self._call("GET", "/oa3-notification/messages?page=1&page_size=5&keyword=交班&status=pending&channel=in_app&strategy=queued&receiver_scope=single") or {}
         self._check("oa3.list_pagination_ready", self._has_paging(oa3_list) or isinstance(oa3_list, list), f"oa3={oa3_list}")
         oa3_item = (self._items(oa3_list) or [{}])[0]
         self._check("oa3.target_name_present", bool(oa3_item.get("target_name")), f"oa3={oa3_list}")
         if oa3_msg.get("id"):
             oa3_deliver = self._call("POST", f"/oa3-notification/messages/{oa3_msg['id']}/action", {"action": "deliver"}) or {}
             self._check("oa3.delivery_strategy_ready", oa3_deliver.get("status") == "sent", f"deliver={oa3_deliver}")
+            oa3_retry = self._call("POST", f"/oa3-notification/messages/{oa3_msg['id']}/action", {"action": "retry"}) or {}
+            self._check("oa3.retry_state_machine_ready", oa3_retry.get("status") == "retrying" and oa3_retry.get("retry_count", 0) >= 1, f"retry={oa3_retry}")
 
         course = self._call("POST", "/oa4-training/courses", {"title": "跌倒预防", "category": "safety", "trainer_id": login["user_id"], "start_date": str(date.today()), "end_date": str(date.today()), "required_score": 80}) or {}
         oa4_courses = self._call("GET", "/oa4-training/courses?page=1&page_size=5&keyword=跌倒") or {}
@@ -273,6 +275,8 @@ class Client:
         record = self._call("POST", "/oa4-training/records", {"course_id": course["id"], "user_id": login["user_id"]}) or {}
         if record.get("id"):
             self._call("POST", f"/oa4-training/records/{record['id']}/action", {"action": "sign_in"})
+            assessed_fail = self._call("POST", f"/oa4-training/records/{record['id']}/action", {"action": "assess", "score": 79}) or {}
+            self._check("oa4.required_score_ready", assessed_fail.get("status") == "failed", f"record={assessed_fail}")
             assessed = self._call("POST", f"/oa4-training/records/{record['id']}/action", {"action": "assess", "score": 92}) or {}
             self._check("oa4.record_closure_ready", assessed.get("status") == "completed", f"record={assessed}")
         oa4_records = self._call("GET", "/oa4-training/records?page=1&page_size=5&keyword=跌倒&status=completed") or {}

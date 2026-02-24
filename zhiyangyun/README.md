@@ -87,6 +87,12 @@ docker compose run --rm seed
 - `GET /api/v1/oa1-shift/templates?page=...&page_size=...&keyword=...&status=...`
 - `GET /api/v1/oa1-shift/assignments?page=...&page_size=...&keyword=...&status=...`
 - `POST /api/v1/oa1-shift/assignments/{id}/status`
+- `GET /api/v1/oa2-approval/requests?page=...&page_size=...&keyword=...&status=...&module=...`
+- `POST /api/v1/oa2-approval/requests/{id}/action`
+- `GET /api/v1/oa3-notification/messages?page=...&page_size=...&keyword=...&status=...&channel=...&strategy=...&receiver_scope=...`
+- `POST /api/v1/oa3-notification/messages/{id}/action`
+- `GET /api/v1/oa4-training/records?page=...&page_size=...&keyword=...&status=...&course_id=...`
+- `POST /api/v1/oa4-training/records/{id}/action`
 
 ## 前端联调入口
 - `M2 长者全周期管理`：建档+入院/转床/退院

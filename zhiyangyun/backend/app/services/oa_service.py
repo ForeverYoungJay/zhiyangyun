@@ -236,7 +236,7 @@ class OAService:
         ).all()
         return [{**self._to_plain(log), "operator_name": real_name or username} for log, real_name, username in rows]
 
-    def list_notifications(self, db: Session, tenant_id: str, page: int = 1, page_size: int = 10, keyword: str = "", status: str = "", channel: str = ""):
+    def list_notifications(self, db: Session, tenant_id: str, page: int = 1, page_size: int = 10, keyword: str = "", status: str = "", channel: str = "", strategy: str = "", receiver_scope: str = ""):
         target = aliased(User)
         stmt = (
             select(NotificationMessage, target.real_name, target.username)
@@ -250,11 +250,21 @@ class OAService:
             stmt = stmt.where(NotificationMessage.status == status)
         if channel:
             stmt = stmt.where(NotificationMessage.channel == channel)
+        if strategy:
+            stmt = stmt.where(NotificationMessage.strategy == strategy)
+        if receiver_scope:
+            stmt = stmt.where(NotificationMessage.receiver_scope == receiver_scope)
         rows = db.execute(stmt.order_by(NotificationMessage.sent_at.desc(), NotificationMessage.id.desc())).all()
         payload = [{**self._to_plain(item), "target_name": real_name or username or "全员"} for item, real_name, username in rows]
         return self._pager(payload, page, page_size)
 
     def create_notification(self, db: Session, tenant_id: str, payload: NotificationMessageCreate):
+        if payload.strategy not in ["immediate", "queued"]:
+            raise ValueError("不支持的触达策略")
+        if payload.receiver_scope == "single" and not payload.target_user_id:
+            raise ValueError("单人通知必须指定目标用户")
+        if payload.receiver_scope == "all":
+            payload.target_user_id = None
         status = "sent" if payload.strategy == "immediate" else "pending"
         delivered_at = datetime.utcnow() if status == "sent" else None
         return self._save(db, NotificationMessage(tenant_id=tenant_id, status=status, delivered_at=delivered_at, **payload.model_dump()))
@@ -263,6 +273,14 @@ class OAService:
         item = db.scalar(select(NotificationMessage).where(NotificationMessage.tenant_id == tenant_id, NotificationMessage.id == message_id))
         if not item:
             raise ValueError("通知不存在")
+        allowed = {
+            "pending": ["deliver", "retry", "fail"],
+            "retrying": ["deliver", "retry", "fail"],
+            "failed": ["retry", "deliver"],
+            "sent": ["retry"],
+        }
+        if payload.action not in allowed.get(item.status, []):
+            raise ValueError(f"状态流转非法: {item.status} -> {payload.action}")
         if payload.action == "deliver":
             item.status = "sent"
             item.delivered_at = datetime.utcnow()
@@ -302,7 +320,7 @@ class OAService:
         trainee = aliased(User)
         evaluator = aliased(User)
         stmt = (
-            select(TrainingRecord, TrainingCourse.title.label("course_title"), trainee.real_name.label("trainee_name"), trainee.username.label("trainee_username"), evaluator.real_name.label("evaluator_name"), evaluator.username.label("evaluator_username"))
+            select(TrainingRecord, TrainingCourse.title.label("course_title"), TrainingCourse.required_score.label("required_score"), trainee.real_name.label("trainee_name"), trainee.username.label("trainee_username"), evaluator.real_name.label("evaluator_name"), evaluator.username.label("evaluator_username"))
             .join(TrainingCourse, and_(TrainingCourse.id == TrainingRecord.course_id, TrainingCourse.tenant_id == tenant_id))
             .join(trainee, and_(trainee.id == TrainingRecord.user_id, trainee.tenant_id == tenant_id))
             .outerjoin(evaluator, and_(evaluator.id == TrainingRecord.evaluator_id, evaluator.tenant_id == tenant_id))
@@ -316,7 +334,7 @@ class OAService:
         if course_id:
             stmt = stmt.where(TrainingRecord.course_id == course_id)
         rows = db.execute(stmt.order_by(TrainingRecord.id.desc())).all()
-        payload = [{**self._to_plain(record), "course_title": course_title, "user_name": trainee_name or trainee_username, "evaluator_name": evaluator_name or evaluator_username or "-"} for record, course_title, trainee_name, trainee_username, evaluator_name, evaluator_username in rows]
+        payload = [{**self._to_plain(record), "course_title": course_title, "required_score": required_score, "user_name": trainee_name or trainee_username, "user_display_name": trainee_name or trainee_username, "evaluator_name": evaluator_name or evaluator_username or "-", "evaluator_display_name": evaluator_name or evaluator_username or "-"} for record, course_title, required_score, trainee_name, trainee_username, evaluator_name, evaluator_username in rows]
         return self._pager(payload, page, page_size)
 
     def create_record(self, db: Session, tenant_id: str, payload: TrainingRecordCreate):
@@ -329,6 +347,8 @@ class OAService:
         item = db.scalar(select(TrainingRecord).where(TrainingRecord.tenant_id == tenant_id, TrainingRecord.id == record_id))
         if not item:
             raise ValueError("培训记录不存在")
+        course = db.scalar(select(TrainingCourse).where(TrainingCourse.tenant_id == tenant_id, TrainingCourse.id == item.course_id))
+        pass_score = course.required_score if course else 60
         if payload.action == "sign_in":
             item.attendance_status = "present"
             item.attended_at = datetime.utcnow()
@@ -339,9 +359,11 @@ class OAService:
         elif payload.action == "assess":
             if payload.score is None:
                 raise ValueError("考核动作必须传 score")
+            if item.attendance_status != "present":
+                raise ValueError("请先完成签到，再进行考核")
             item.score = payload.score
-            item.exam_status = "passed" if payload.score >= 60 else "failed"
-            item.status = "completed" if payload.score >= 60 and item.attendance_status == "present" else "failed"
+            item.exam_status = "passed" if payload.score >= pass_score else "failed"
+            item.status = "completed" if payload.score >= pass_score else "failed"
             item.evaluator_id = operator_id
             item.assessed_at = datetime.utcnow()
             item.completed_on = date.today()

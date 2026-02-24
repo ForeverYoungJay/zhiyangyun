@@ -71,18 +71,19 @@
 
 - OA3 通知：`/oa3-notification/*`
   - 列表查询：
-    - `GET /oa3-notification/messages?page=...&page_size=...&keyword=...&status=...&channel=...`
+    - `GET /oa3-notification/messages?page=...&page_size=...&keyword=...&status=...&channel=...&strategy=...&receiver_scope=...`
   - 触达策略：
-    - `POST /oa3-notification/messages`（支持 `strategy=immediate/queued`、`target_user_id`）
-    - `POST /oa3-notification/messages/{id}/action`（`deliver/retry/fail`）
+    - `POST /oa3-notification/messages`（支持 `strategy=immediate/queued`、`receiver_scope=all/single`、`target_user_id`）
+    - `POST /oa3-notification/messages/{id}/action`（`deliver/retry/fail`，含状态机约束）
   - 姓名化：`target_name`
 
 - OA4 培训：`/oa4-training/*`
   - 计划列表：
     - `GET /oa4-training/courses?page=...&page_size=...&keyword=...&status=...`
   - 签到/考核闭环：
+    - `GET /oa4-training/records?page=...&page_size=...&keyword=...&status=...&course_id=...`
     - `POST /oa4-training/records`
-    - `POST /oa4-training/records/{id}/action`（`sign_in/absent/assess`）
+    - `POST /oa4-training/records/{id}/action`（`sign_in/absent/assess`；考核前必须签到，及格线取课程 `required_score`）
     - `GET /oa4-training/courses/{id}/closure`
   - 名称化：`trainer_name/user_name/evaluator_name`
 

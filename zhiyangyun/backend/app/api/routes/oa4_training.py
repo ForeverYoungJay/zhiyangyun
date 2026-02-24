@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentUser, get_current_user
@@ -23,7 +23,10 @@ def list_courses(page: int = 1, page_size: int = 10, keyword: str = "", status: 
 
 @router.post("/courses", response_model=ApiResponse)
 def create_course(payload: TrainingCourseCreate, db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
-    return ApiResponse(message="created", data=service.create_course(db, current.tenant_id, payload))
+    try:
+        return ApiResponse(message="created", data=service.create_course(db, current.tenant_id, payload))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/records", response_model=ApiResponse)
@@ -33,12 +36,18 @@ def list_records(page: int = 1, page_size: int = 10, keyword: str = "", status: 
 
 @router.post("/records", response_model=ApiResponse)
 def create_record(payload: TrainingRecordCreate, db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
-    return ApiResponse(message="created", data=service.create_record(db, current.tenant_id, payload))
+    try:
+        return ApiResponse(message="created", data=service.create_record(db, current.tenant_id, payload))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/records/{record_id}/action", response_model=ApiResponse)
 def action_record(record_id: str, payload: TrainingRecordActionPayload, db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
-    return ApiResponse(message="updated", data=service.action_record(db, current.tenant_id, record_id, payload, current.user_id))
+    try:
+        return ApiResponse(message="updated", data=service.action_record(db, current.tenant_id, record_id, payload, current.user_id))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/courses/{course_id}/closure", response_model=ApiResponse)

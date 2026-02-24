@@ -5,7 +5,9 @@
       <el-form inline>
         <el-form-item label="关键字"><el-input v-model="query.keyword" clearable placeholder="标题/内容" /></el-form-item>
         <el-form-item label="渠道"><el-select v-model="query.channel" clearable style="width:120px"><el-option label="站内" value="in_app" /><el-option label="短信" value="sms" /><el-option label="邮件" value="email" /></el-select></el-form-item>
-        <el-form-item label="状态"><el-select v-model="query.status" clearable style="width:120px"><el-option label="待发" value="pending" /><el-option label="已送达" value="sent" /><el-option label="失败" value="failed" /></el-select></el-form-item>
+        <el-form-item label="状态"><el-select v-model="query.status" clearable style="width:120px"><el-option label="待发" value="pending" /><el-option label="重试中" value="retrying" /><el-option label="已送达" value="sent" /><el-option label="失败" value="failed" /></el-select></el-form-item>
+        <el-form-item label="策略"><el-select v-model="query.strategy" clearable style="width:120px"><el-option label="立即" value="immediate" /><el-option label="队列" value="queued" /></el-select></el-form-item>
+        <el-form-item label="范围"><el-select v-model="query.receiver_scope" clearable style="width:120px"><el-option label="全员" value="all" /><el-option label="单人" value="single" /></el-select></el-form-item>
         <el-button type="primary" @click="load">查询</el-button>
         <el-button @click="createVisible = true">新建通知</el-button>
       </el-form>
@@ -40,7 +42,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '../../api/http'
 
-const query = reactive({ page: 1, page_size: 10, keyword: '', status: '', channel: '' })
+const query = reactive({ page: 1, page_size: 10, keyword: '', status: '', channel: '', strategy: '', receiver_scope: '' })
 const rows = reactive<any>({ items: [], total: 0 })
 const users = ref<any[]>([])
 const createVisible = ref(false)

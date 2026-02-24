@@ -24,6 +24,7 @@
       <el-form inline>
         <el-form-item label="关键字"><el-input v-model="recordQuery.keyword" clearable /></el-form-item>
         <el-form-item label="状态"><el-select v-model="recordQuery.status" clearable style="width:120px"><el-option label="学习中" value="learning"/><el-option label="通过" value="completed"/><el-option label="未通过" value="failed"/></el-select></el-form-item>
+        <el-form-item label="课程"><el-select v-model="recordQuery.course_id" clearable style="width:180px"><el-option v-for="c in courses.items" :key="c.id" :label="c.title" :value="c.id"/></el-select></el-form-item>
         <el-button type="primary" @click="loadRecords">查询</el-button>
       </el-form>
       <el-table :data="records.items" border>
@@ -31,6 +32,7 @@
         <el-table-column prop="user_name" label="学员" width="120"/>
         <el-table-column prop="attendance_status" label="签到" width="90"/>
         <el-table-column prop="score" label="分数" width="80"/>
+        <el-table-column prop="required_score" label="及格线" width="80"/>
         <el-table-column prop="exam_status" label="考核" width="90"/>
         <el-table-column prop="status" label="闭环" width="90"/>
         <el-table-column label="操作" width="220"><template #default="{row}"><el-button link type="primary" @click="actRecord(row.id,'sign_in')">签到</el-button><el-button link type="danger" @click="actRecord(row.id,'absent')">缺勤</el-button><el-button link type="success" @click="assess(row.id)">考核</el-button></template></el-table-column>
@@ -54,7 +56,7 @@ const users = ref<any[]>([])
 const courses = reactive<any>({ items: [], total: 0 })
 const records = reactive<any>({ items: [], total: 0 })
 const courseQuery = reactive({ page: 1, page_size: 10, keyword: '', status: '' })
-const recordQuery = reactive({ page: 1, page_size: 10, keyword: '', status: '' })
+const recordQuery = reactive({ page: 1, page_size: 10, keyword: '', status: '', course_id: '' })
 
 const courseVisible = ref(false)
 const recordVisible = ref(false)
