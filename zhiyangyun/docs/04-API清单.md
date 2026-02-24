@@ -49,6 +49,12 @@
 
 ## A2
 - OA1 排班：`/oa1-shift/*`
+  - 列表查询：
+    - `GET /oa1-shift/templates?page=...&page_size=...&keyword=...&status=...`
+    - `GET /oa1-shift/assignments?page=...&page_size=...&keyword=...&status=...&shift_id=...&user_id=...&duty_date=...`
+  - 状态流转：
+    - `POST /oa1-shift/assignments/{id}/status`（`publish/execute/mark_exception/reopen`）
+  - 姓名化字段：`user_name/username/shift_name`
 - OA2 审批：`/oa2-approval/*`
 - OA3 通知：`/oa3-notification/*`
 - OA4 培训：`/oa4-training/*`

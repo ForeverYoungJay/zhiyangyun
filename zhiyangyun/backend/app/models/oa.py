@@ -14,6 +14,7 @@ class ShiftTemplate(Base, TenantBaseMixin):
     name: Mapped[str] = mapped_column(String(50), nullable=False)
     start_time: Mapped[str] = mapped_column(String(5), nullable=False)
     end_time: Mapped[str] = mapped_column(String(5), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")
 
 
 class ShiftAssignment(Base, TenantBaseMixin):
@@ -23,7 +24,7 @@ class ShiftAssignment(Base, TenantBaseMixin):
     shift_id: Mapped[str] = mapped_column(String(36), ForeignKey("shift_templates.id"), nullable=False)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     duty_date: Mapped[date] = mapped_column(Date, nullable=False)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="assigned")
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")
 
 
 class ApprovalRequest(Base, TenantBaseMixin):

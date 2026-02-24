@@ -6,12 +6,19 @@ class ShiftTemplateCreate(BaseModel):
     name: str
     start_time: str
     end_time: str
+    status: str = "draft"
 
 
 class ShiftAssignmentCreate(BaseModel):
     shift_id: str
     user_id: str
     duty_date: date
+    status: str = "draft"
+
+
+class ShiftAssignmentStatusUpdate(BaseModel):
+    action: str
+    note: str = ""
 
 
 class ApprovalRequestCreate(BaseModel):
