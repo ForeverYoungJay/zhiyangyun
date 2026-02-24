@@ -24,8 +24,14 @@ class ShiftAssignmentStatusUpdate(BaseModel):
 class ApprovalRequestCreate(BaseModel):
     module: str
     biz_id: str
-    applicant_id: str
     approver_id: str | None = None
+    cc_user_ids: list[str] = []
+    total_steps: int = 1
+    note: str = ""
+
+
+class ApprovalActionPayload(BaseModel):
+    action: str
     note: str = ""
 
 
@@ -34,15 +40,30 @@ class NotificationMessageCreate(BaseModel):
     content: str
     channel: str = "in_app"
     receiver_scope: str = "all"
+    target_user_id: str | None = None
+    strategy: str = "immediate"
+
+
+class NotificationActionPayload(BaseModel):
+    action: str
+    note: str = ""
 
 
 class TrainingCourseCreate(BaseModel):
     title: str
     category: str = "service"
+    trainer_id: str | None = None
+    start_date: date | None = None
+    end_date: date | None = None
     required_score: int = 60
 
 
 class TrainingRecordCreate(BaseModel):
     course_id: str
     user_id: str
-    score: int = 0
+
+
+class TrainingRecordActionPayload(BaseModel):
+    action: str
+    score: int | None = None
+    remark: str = ""

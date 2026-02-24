@@ -156,8 +156,8 @@ const loadAssignments = async () => {
 
 const createTemplate = async () => {
   const form: any = { name: '', start_time: '08:00', end_time: '16:00', status: 'draft' }
-  await ElMessageBox.prompt('请输入班次名称', '新建模板', { inputValue: '白班' }).then(async ({ value }) => {
-    form.name = value
+  await ElMessageBox.prompt('请输入班次名称', '新建模板', { inputValue: '白班' }).then(async (result: any) => {
+    form.name = result.value
     await http.post('/oa1-shift/templates', form)
     ElMessage.success('模板已创建')
     await loadTemplates()
@@ -169,7 +169,8 @@ const createAssignment = async () => {
     ElMessage.warning('请先创建班次模板')
     return
   }
-  const { value } = await ElMessageBox.prompt('请输入值班人员 user_id（可从其他模块复制）', '新建排班')
+  const prompt: any = await ElMessageBox.prompt('请输入值班人员 user_id（可从其他模块复制）', '新建排班')
+  const value = prompt.value
   const shift = templates.items[0]
   const today = new Date().toISOString().slice(0, 10)
   try {

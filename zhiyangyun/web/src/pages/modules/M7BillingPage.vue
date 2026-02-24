@@ -229,7 +229,8 @@ const createManualInvoice = async () => {
 }
 
 const writeoff = async (row: any) => {
-  const { value } = await ElMessageBox.prompt(`请输入核销金额（未收：${row.unpaid_amount}）`, '发票核销', { inputValue: `${row.unpaid_amount}` })
+  const prompt: any = await ElMessageBox.prompt(`请输入核销金额（未收：${row.unpaid_amount}）`, '发票核销', { inputValue: `${row.unpaid_amount}` })
+  const value = prompt.value
   await http.post(`/m7-billing/invoices/${row.id}/writeoff`, { amount: Number(value), note: '前台核销' })
   ElMessage.success('核销成功')
   await loadAll()

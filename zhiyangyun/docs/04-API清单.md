@@ -61,8 +61,30 @@
   - 姓名化字段：`user_name/display_name/username/shift_name`
 
 - OA2 审批：`/oa2-approval/*`
+  - 列表查询：
+    - `GET /oa2-approval/requests?page=...&page_size=...&keyword=...&status=...&module=...`
+  - 状态机与抄送：
+    - `POST /oa2-approval/requests`（支持 `cc_user_ids[]`、`total_steps`）
+    - `POST /oa2-approval/requests/{id}/action`（`approve/reject/cancel`）
+    - `GET /oa2-approval/requests/{id}/logs`（审批轨迹）
+  - 姓名化：`applicant_display_name/approver_display_name/cc_names[]`
+
 - OA3 通知：`/oa3-notification/*`
+  - 列表查询：
+    - `GET /oa3-notification/messages?page=...&page_size=...&keyword=...&status=...&channel=...`
+  - 触达策略：
+    - `POST /oa3-notification/messages`（支持 `strategy=immediate/queued`、`target_user_id`）
+    - `POST /oa3-notification/messages/{id}/action`（`deliver/retry/fail`）
+  - 姓名化：`target_name`
+
 - OA4 培训：`/oa4-training/*`
+  - 计划列表：
+    - `GET /oa4-training/courses?page=...&page_size=...&keyword=...&status=...`
+  - 签到/考核闭环：
+    - `POST /oa4-training/records`
+    - `POST /oa4-training/records/{id}/action`（`sign_in/absent/assess`）
+    - `GET /oa4-training/courses/{id}/closure`
+  - 名称化：`trainer_name/user_name/evaluator_name`
 
 ## B
 - B1：`/b1-miniapp/*`
