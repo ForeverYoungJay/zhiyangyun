@@ -1,6 +1,7 @@
 from datetime import date, datetime
 
 from sqlalchemy import and_, or_, select
+from sqlalchemy.inspection import inspect
 from sqlalchemy.orm import Session
 
 from app.models.oa import (
@@ -31,7 +32,10 @@ class OAService:
         return obj
 
     def _to_plain(self, obj):
-        return {k: v for k, v in vars(obj).items() if not k.startswith("_")}
+        if obj is None:
+            return {}
+        mapper = inspect(obj).mapper
+        return {attr.key: getattr(obj, attr.key) for attr in mapper.column_attrs}
 
     def _pager(self, rows: list, page: int, page_size: int):
         total = len(rows)
@@ -131,11 +135,11 @@ class OAService:
         if user_id:
             stmt = stmt.where(ShiftAssignment.user_id == user_id)
         if duty_date:
-            stmt = stmt.where(ShiftAssignment.duty_date == duty_date)
+            stmt = stmt.where(ShiftAssignment.duty_date == date.fromisoformat(duty_date))
         if start_date:
-            stmt = stmt.where(ShiftAssignment.duty_date >= start_date)
+            stmt = stmt.where(ShiftAssignment.duty_date >= date.fromisoformat(start_date))
         if end_date:
-            stmt = stmt.where(ShiftAssignment.duty_date <= end_date)
+            stmt = stmt.where(ShiftAssignment.duty_date <= date.fromisoformat(end_date))
 
         rows = db.execute(stmt.order_by(ShiftAssignment.duty_date.desc(), ShiftAssignment.id.desc())).all()
         payload = [

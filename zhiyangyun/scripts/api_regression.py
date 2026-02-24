@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import json
 import sys
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from urllib import request, error, parse
 
 CLI_ARGS = sys.argv[1:]
@@ -218,16 +218,18 @@ class Client:
         first_invoice = (m7_invoice_items or [{}])[0]
         self._check("m7.invoice_name_present", bool(first_invoice.get("elder_name") and first_invoice.get("unpaid_amount") is not None), f"invoices={m7_paged_invoices}")
 
-        shift = self._call("POST", "/oa1-shift/templates", {"name": "早班", "start_time": "08:00", "end_time": "16:00", "status": "draft"})
-        shift_late = self._call("POST", "/oa1-shift/templates", {"name": "晚班", "start_time": "14:00", "end_time": "22:00", "status": "draft"})
-        assignment = self._call("POST", "/oa1-shift/assignments", {"shift_id": shift["id"], "user_id": login["user_id"], "duty_date": str(date.today()), "status": "draft"}) or {}
-        overlap_assignment = self._call("POST", "/oa1-shift/assignments", {"shift_id": shift_late["id"], "user_id": login["user_id"], "duty_date": str(date.today()), "status": "draft"}, expect=400)
+        shift_suffix = datetime.now().strftime('%H%M%S')
+        shift = self._call("POST", "/oa1-shift/templates", {"name": f"早班{shift_suffix}", "start_time": "08:00", "end_time": "16:00", "status": "draft"})
+        shift_late = self._call("POST", "/oa1-shift/templates", {"name": f"晚班{shift_suffix}", "start_time": "14:00", "end_time": "22:00", "status": "draft"})
+        duty_date = date.today() + timedelta(days=(datetime.now().hour * 60 + datetime.now().minute) % 3650 + 1)
+        duty_date_str = str(duty_date)
+        assignment = self._call("POST", "/oa1-shift/assignments", {"shift_id": shift["id"], "user_id": login["user_id"], "duty_date": duty_date_str, "status": "draft"}) or {}
+        overlap_assignment = self._call("POST", "/oa1-shift/assignments", {"shift_id": shift_late["id"], "user_id": login["user_id"], "duty_date": duty_date_str, "status": "draft"}, expect=400)
         self._check("oa1.assignment_conflict_detection", overlap_assignment is None, "overlap assignment should be rejected")
 
         oa1_templates = self._call("GET", "/oa1-shift/templates?page=1&page_size=5&keyword=早班&status=draft") or {}
         self._check("oa1.template_pagination_ready", self._has_paging(oa1_templates) or isinstance(oa1_templates, list), f"templates={oa1_templates}")
-        today_str = str(date.today())
-        oa1_assignments = self._call("GET", f"/oa1-shift/assignments?page=1&page_size=5&keyword=早班&status=draft&start_date={today_str}&end_date={today_str}") or {}
+        oa1_assignments = self._call("GET", f"/oa1-shift/assignments?page=1&page_size=5&keyword=早班&status=draft&start_date={duty_date_str}&end_date={duty_date_str}") or {}
         self._check("oa1.assignment_pagination_ready", self._has_paging(oa1_assignments) or isinstance(oa1_assignments, list), f"assignments={oa1_assignments}")
         oa1_assignment_items = self._items(oa1_assignments)
         first_assignment = (oa1_assignment_items or [{}])[0]
