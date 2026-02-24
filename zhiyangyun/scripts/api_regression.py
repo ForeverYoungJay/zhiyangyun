@@ -215,17 +215,24 @@ class Client:
         self._check("m7.invoice_name_present", bool(first_invoice.get("elder_name") and first_invoice.get("unpaid_amount") is not None), f"invoices={m7_paged_invoices}")
 
         shift = self._call("POST", "/oa1-shift/templates", {"name": "早班", "start_time": "08:00", "end_time": "16:00", "status": "draft"})
+        shift_late = self._call("POST", "/oa1-shift/templates", {"name": "晚班", "start_time": "14:00", "end_time": "22:00", "status": "draft"})
         assignment = self._call("POST", "/oa1-shift/assignments", {"shift_id": shift["id"], "user_id": login["user_id"], "duty_date": str(date.today()), "status": "draft"}) or {}
+        overlap_assignment = self._call("POST", "/oa1-shift/assignments", {"shift_id": shift_late["id"], "user_id": login["user_id"], "duty_date": str(date.today()), "status": "draft"}, expect=400)
+        self._check("oa1.assignment_conflict_detection", overlap_assignment is None, "overlap assignment should be rejected")
+
         oa1_templates = self._call("GET", "/oa1-shift/templates?page=1&page_size=5&keyword=早班&status=draft") or {}
         self._check("oa1.template_pagination_ready", self._has_paging(oa1_templates) or isinstance(oa1_templates, list), f"templates={oa1_templates}")
-        oa1_assignments = self._call("GET", "/oa1-shift/assignments?page=1&page_size=5&keyword=早班&status=draft") or {}
+        today_str = str(date.today())
+        oa1_assignments = self._call("GET", f"/oa1-shift/assignments?page=1&page_size=5&keyword=早班&status=draft&start_date={today_str}&end_date={today_str}") or {}
         self._check("oa1.assignment_pagination_ready", self._has_paging(oa1_assignments) or isinstance(oa1_assignments, list), f"assignments={oa1_assignments}")
         oa1_assignment_items = self._items(oa1_assignments)
         first_assignment = (oa1_assignment_items or [{}])[0]
-        self._check("oa1.assignment_name_present", bool(first_assignment.get("user_name") and first_assignment.get("shift_name")), f"assignments={oa1_assignments}")
+        self._check("oa1.assignment_name_present", bool(first_assignment.get("display_name") and first_assignment.get("shift_name")), f"assignments={oa1_assignments}")
         if assignment.get("id"):
             oa1_publish = self._call("POST", f"/oa1-shift/assignments/{assignment['id']}/status", {"action": "publish", "note": "回归发布"}) or {}
             self._check("oa1.status_publish", oa1_publish.get("status") == "published", f"publish={oa1_publish}")
+            approvals = self._call("GET", "/oa2-approval/requests") or []
+            self._check("oa1.approval_linkage_ready", any((x.get("module") == "oa1_shift" and x.get("biz_id") == assignment["id"]) for x in approvals), f"approvals={approvals}")
             oa1_execute = self._call("POST", f"/oa1-shift/assignments/{assignment['id']}/status", {"action": "execute", "note": "回归执行"}) or {}
             self._check("oa1.status_execute", oa1_execute.get("status") == "executed", f"execute={oa1_execute}")
             oa1_exception = self._call("POST", f"/oa1-shift/assignments/{assignment['id']}/status", {"action": "reopen", "note": "回归重开"}) or {}
