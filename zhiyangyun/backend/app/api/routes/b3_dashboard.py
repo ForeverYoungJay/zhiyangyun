@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentUser, get_current_user
@@ -12,8 +12,15 @@ service = BusinessService()
 
 
 @router.get("/metrics", response_model=ApiResponse)
-def list_metrics(db: Session = Depends(get_db), current: CurrentUser = Depends(get_current_user)):
-    return ApiResponse(data=service.list_metrics(db, current.tenant_id))
+def list_metrics(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
+    start_date: str = Query(default=""),
+    end_date: str = Query(default=""),
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(get_current_user),
+):
+    return ApiResponse(data=service.list_metrics(db, current.tenant_id, page, page_size, start_date, end_date))
 
 
 @router.post("/metrics", response_model=ApiResponse)

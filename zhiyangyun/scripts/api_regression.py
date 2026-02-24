@@ -244,20 +244,55 @@ class Client:
             oa1_exception = self._call("POST", f"/oa1-shift/assignments/{assignment['id']}/status", {"action": "reopen", "note": "回归重开"}) or {}
             self._check("oa1.status_reopen", oa1_exception.get("status") == "draft", f"reopen={oa1_exception}")
 
-        self._call("POST", "/oa2-approval/requests", {"module": "care", "biz_id": elder["id"], "applicant_id": login["user_id"], "note": "请审批"})
-        self._call("GET", "/oa2-approval/requests")
-        self._call("POST", "/oa3-notification/messages", {"title": "交班", "content": "请查看", "channel": "in_app", "receiver_scope": "all"})
-        self._call("GET", "/oa3-notification/messages")
-        course = self._call("POST", "/oa4-training/courses", {"title": "跌倒预防", "category": "safety", "required_score": 80})
-        self._call("POST", "/oa4-training/records", {"course_id": course["id"], "user_id": login["user_id"], "score": 92})
-        self._call("GET", "/oa4-training/courses")
-        self._call("GET", "/oa4-training/records")
+        oa2_req = self._call("POST", "/oa2-approval/requests", {"module": "care", "biz_id": elder["id"], "approver_id": login["user_id"], "cc_user_ids": [login["user_id"]], "total_steps": 2, "note": "请审批"}) or {}
+        oa2_list = self._call("GET", "/oa2-approval/requests?page=1&page_size=5&keyword=请审批&status=pending") or {}
+        self._check("oa2.list_pagination_ready", self._has_paging(oa2_list) or isinstance(oa2_list, list), f"oa2={oa2_list}")
+        oa2_item = (self._items(oa2_list) or [{}])[0]
+        self._check("oa2.name_and_cc_present", bool(oa2_item.get("applicant_display_name") and isinstance(oa2_item.get("cc_names"), list)), f"oa2={oa2_list}")
+        if oa2_req.get("id"):
+            oa2_approve_1 = self._call("POST", f"/oa2-approval/requests/{oa2_req['id']}/action", {"action": "approve", "note": "一级通过"}) or {}
+            oa2_approve_2 = self._call("POST", f"/oa2-approval/requests/{oa2_req['id']}/action", {"action": "approve", "note": "二级通过"}) or {}
+            oa2_logs = self._call("GET", f"/oa2-approval/requests/{oa2_req['id']}/logs") or []
+            self._check("oa2.state_machine_done", oa2_approve_2.get("status") == "approved", f"oa2={oa2_approve_2}")
+            self._check("oa2.logs_ready", len(oa2_logs) >= 2, f"logs={oa2_logs}")
 
-        self._call("POST", "/b1-miniapp/requests", {"elder_id": elder["id"], "request_type": "repair", "content": "呼叫器异常"})
-        self._call("GET", "/b1-miniapp/requests")
+        oa3_msg = self._call("POST", "/oa3-notification/messages", {"title": "交班", "content": "请查看", "channel": "in_app", "receiver_scope": "single", "target_user_id": login["user_id"], "strategy": "queued"}) or {}
+        oa3_list = self._call("GET", "/oa3-notification/messages?page=1&page_size=5&keyword=交班&status=pending&channel=in_app") or {}
+        self._check("oa3.list_pagination_ready", self._has_paging(oa3_list) or isinstance(oa3_list, list), f"oa3={oa3_list}")
+        oa3_item = (self._items(oa3_list) or [{}])[0]
+        self._check("oa3.target_name_present", bool(oa3_item.get("target_name")), f"oa3={oa3_list}")
+        if oa3_msg.get("id"):
+            oa3_deliver = self._call("POST", f"/oa3-notification/messages/{oa3_msg['id']}/action", {"action": "deliver"}) or {}
+            self._check("oa3.delivery_strategy_ready", oa3_deliver.get("status") == "sent", f"deliver={oa3_deliver}")
+
+        course = self._call("POST", "/oa4-training/courses", {"title": "跌倒预防", "category": "safety", "trainer_id": login["user_id"], "start_date": str(date.today()), "end_date": str(date.today()), "required_score": 80}) or {}
+        oa4_courses = self._call("GET", "/oa4-training/courses?page=1&page_size=5&keyword=跌倒") or {}
+        self._check("oa4.course_pagination_ready", self._has_paging(oa4_courses) or isinstance(oa4_courses, list), f"course={oa4_courses}")
+        course_item = (self._items(oa4_courses) or [{}])[0]
+        self._check("oa4.course_name_present", bool(course_item.get("trainer_name")), f"course={oa4_courses}")
+        record = self._call("POST", "/oa4-training/records", {"course_id": course["id"], "user_id": login["user_id"]}) or {}
+        if record.get("id"):
+            self._call("POST", f"/oa4-training/records/{record['id']}/action", {"action": "sign_in"})
+            assessed = self._call("POST", f"/oa4-training/records/{record['id']}/action", {"action": "assess", "score": 92}) or {}
+            self._check("oa4.record_closure_ready", assessed.get("status") == "completed", f"record={assessed}")
+        oa4_records = self._call("GET", "/oa4-training/records?page=1&page_size=5&keyword=跌倒&status=completed") or {}
+        self._check("oa4.record_pagination_ready", self._has_paging(oa4_records) or isinstance(oa4_records, list), f"records={oa4_records}")
+        if course.get("id"):
+            closure = self._call("GET", f"/oa4-training/courses/{course['id']}/closure") or {}
+            self._check("oa4.closure_stats_ready", isinstance(closure, dict) and "closure_rate" in closure, f"closure={closure}")
+
+        b1_created = self._call("POST", "/b1-miniapp/requests", {"elder_id": elder["id"], "request_type": "repair", "content": "呼叫器异常"}) or {}
+        b1_list = self._call("GET", "/b1-miniapp/requests?page=1&page_size=5&keyword=呼叫器&status=pending") or {}
+        self._check("b1.request_pagination_ready", self._has_paging(b1_list) or isinstance(b1_list, list), f"b1={b1_list}")
+        b1_items = self._items(b1_list)
+        self._check("b1.request_name_present", bool(b1_items and b1_items[0].get("elder_name")), f"b1={b1_list}")
+        if b1_created.get("id"):
+            b1_updated = self._call("POST", f"/b1-miniapp/requests/{b1_created['id']}/status?status=completed") or {}
+            self._check("b1.request_status_flow", b1_updated.get("status") == "completed", f"updated={b1_updated}")
         family = self._call("POST", "/b2-family/accounts", {"elder_id": elder["id"], "name": "家属A", "phone": "13700000000", "relation": "子女"})
         self._call("POST", "/b2-family/visits", {"family_id": family["id"], "visit_date": str(date.today())})
-        self._call("GET", "/b2-family/accounts")
+        family_accounts = self._call("GET", "/b2-family/accounts?page=1&page_size=5&keyword=家属A&relation=子女") or {}
+        self._check("family.accounts_pagination_name_ready", self._has_paging(family_accounts) or isinstance(family_accounts, list), f"accounts={family_accounts}")
         self._call("GET", "/b2-family/visits")
         family_overview = self._call("GET", f"/b2-family/elders/{elder['id']}/overview") or {}
         family_catalog = self._call("GET", "/b2-family/services/catalog") or {}
@@ -266,13 +301,15 @@ class Client:
         if family_catalog.get("packages"):
             self._call("POST", "/b2-family/services/order", {"elder_id": elder["id"], "package_id": family_catalog["packages"][0]["id"]})
 
-        family_bills = self._call("GET", f"/b2-family/elders/{elder['id']}/bills") or []
-        family_records = self._call("GET", f"/b2-family/elders/{elder['id']}/care-records") or []
-        self._check("linkage.auto_billing_visible_to_family", len(family_bills) > 0, f"bills={family_bills}")
-        self._check("linkage.care_record_visible_to_family", len(family_records) > 0, f"records={family_records}")
+        family_bills = self._call("GET", f"/b2-family/elders/{elder['id']}/bills?page=1&page_size=10&status=unpaid") or {}
+        family_records = self._call("GET", f"/b2-family/elders/{elder['id']}/care-records?page=1&page_size=10") or {}
+        self._check("linkage.auto_billing_visible_to_family", len(self._items(family_bills)) > 0, f"bills={family_bills}")
+        self._check("linkage.care_record_visible_to_family", len(self._items(family_records)) > 0, f"records={family_records}")
         self._call("POST", "/b2-family/surveys", {"elder_id": elder["id"], "family_id": family["id"], "score": 5, "comment": "满意"})
-        surveys = self._call("GET", f"/b2-family/surveys?elder_id={elder['id']}") or []
-        self._check("linkage.family_survey_recorded", len(surveys) > 0, f"surveys={surveys}")
+        surveys = self._call("GET", f"/b2-family/surveys?elder_id={elder['id']}&page=1&page_size=10") or {}
+        self._check("linkage.family_survey_recorded", len(self._items(surveys)) > 0, f"surveys={surveys}")
+        family_notifications = self._call("GET", "/b2-family/notifications?page=1&page_size=10&keyword=家属") or {}
+        self._check("family.notifications_ready", self._has_paging(family_notifications) or isinstance(family_notifications, list), f"notifications={family_notifications}")
 
         cat = self._call("POST", "/shop/categories", {"name_zh": "护理用品", "code": f"CAT{datetime.now().strftime('%H%M%S')}"})
         spu = self._call("POST", "/shop/spu", {"category_id": cat["id"], "name_zh": "护理湿巾", "subtitle_zh": "加厚款", "description_zh": "无酒精"}) if cat else None
@@ -306,15 +343,16 @@ class Client:
         account_ledger = self._call("GET", f"/shop/elders/{elder['id']}/account-ledger") or []
         self._check("shop.account_ledger_ready", len(account_ledger) > 0, f"ledger={account_ledger}")
 
-        family_orders = self._call("GET", f"/b2-family/elders/{elder['id']}/orders") or []
-        family_balance = self._call("GET", f"/b2-family/elders/{elder['id']}/balance-changes") or []
-        self._check("family.shop_orders_visible", len(family_orders) > 0, f"orders={family_orders}")
-        self._check("family.balance_changes_visible", len(family_balance) > 0, f"balance={family_balance}")
+        family_orders = self._call("GET", f"/b2-family/elders/{elder['id']}/orders?page=1&page_size=10") or {}
+        family_balance = self._call("GET", f"/b2-family/elders/{elder['id']}/balance-changes?page=1&page_size=10") or {}
+        self._check("family.shop_orders_visible", len(self._items(family_orders)) > 0, f"orders={family_orders}")
+        self._check("family.balance_changes_visible", len(self._items(family_balance)) > 0, f"balance={family_balance}")
 
         self._call("POST", "/b3-dashboard/metrics", {"metric_date": str(date.today()), "occupancy_rate": 86.5, "revenue": 1000, "alerts": 2})
-        self._call("GET", "/b3-dashboard/metrics")
+        b3_metrics = self._call("GET", f"/b3-dashboard/metrics?page=1&page_size=5&start_date={str(date.today())}&end_date={str(date.today())}") or {}
+        self._check("b3.metrics_pagination_ready", self._has_paging(b3_metrics) or isinstance(b3_metrics, list), f"metrics={b3_metrics}")
         summary = self._call("GET", "/b3-dashboard/performance-summary") or {}
-        self._check("linkage.performance_summary", isinstance(summary, dict) and len(summary) > 0, f"summary={summary}")
+        self._check("linkage.performance_summary", isinstance(summary, dict) and len(summary) > 0 and "manual_metric_date" in summary, f"summary={summary}")
 
         self._call("GET", f"/elders/{elder['id']}/logs")
         self._call("POST", f"/elders/{elder['id']}/discharge", {"discharge_date": str(date.today()), "note": "脚本退院"})
